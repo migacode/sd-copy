@@ -1,0 +1,202 @@
+#!/bin/bash
+###############################################################################
+#                                                                             #
+#                               Quick Disk Copy                               #
+#          ---------------------------------------------------------          #
+#             Simple Shell-Frontend for Clonezilla (ocs-onthefly)             #
+#                                                                             #
+#                       (C)opyright bei Michael Gasbers                       #
+#                      MIGANO Professional Web Solutions                      #
+#                                                                             #
+#                             All rights reserved.                            #
+#                                                                             #
+###############################################################################
+#                                                                             #
+# DIESE SOFTWARE WIRD OHNE MÄNGELGEWÄHR UND OHNE JEGLICHE AUSDRÜCKLICHE ODER  #
+# STILLSCHWEIGENDE GARANTIE ZUR VERFÜGUNG GESTELLT, EINSCHLIESSLICH UND OHNE  #
+# EINSCHRÄNKUNG JEGLICHER GARANTIE FÜR DIE GEBRAUCHSTAUGLICHKEIT ODER EIGNUNG #
+# FÜR EINEN BESTIMMTEN ZWECK. ALLE RISIKEN IN BEZUG AUF ERGEBNISSE UND        #
+# LEISTUNG DIESER SOFTWARE WERDEN VOLLSTÄNDIG VOM BENUTZER ÜBERNOMMEN!        #
+#  *************************************************************************  #
+# THIS SOFTWARE IS PROVIDED "AS IS" WITH NO WARRANTIES WHAT SO EVER, WHETHER  #
+# EXPRESSED OR IMPLIED, INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF       #
+# USABILITY OR FITNESS FOR A PARTICULAR PURPOSE. ALL RISKS CONCERNING RESULTS #
+# AND PERFORMANCE OF THIS SOFTWARE ARE ASSUMED COMPLETELY BY THE USER!        #
+#                                                                             #
+###############################################################################
+#                                                                             #
+#  Jegliche Form der Kopie, Veränderung und kommerziellen Verbreitung dieses  #
+#  Scripts oder Teilen davon sowie des Quellcodes ist strengstens verboten!   #
+#  *************************************************************************  #
+#   Any form of copying, modification or commercial distribution of this      #
+#   script or any part thereof or it's sourcecode is strictly prohibited!     #
+#  *************************************************************************  #
+#   Für Anregungen und Fragen nehmen Sie bitte Kontakt mit uns auf über       #
+#   https://migano.de oder per E-Mail an >> kontakt@migano.de <<. Danke.      #
+#                                                                             #
+###############################################################################
+VERSION="1.10"
+# Letzte Änderung: 09.11.2022
+###############################################################################
+
+dark_grey='\033[0;90m'
+bold_red='\033[1;31m'
+bold_green='\033[1;32m'
+bold_yellow='\033[1;33m'
+bold_blue='\033[1;34m'
+bold_purple='\033[1;35m'
+bold_cyan='\033[1;36m'
+bold_white='\033[1;37m'
+colors_off='\033[0m'
+line_color='\033[0;90m'
+
+FULL_LINE="${line_color}$(printf '─%.0s' {1..80})${colors_off}"
+
+OK_TAG="${bold_green}ok${colors_off}"
+ERROR_TAG="${bold_red}Fehler${colors_off}"
+
+###############################################################################
+# Funktion zur einfachen Ja/Nein-Abfrage
+# Rückgaben: 0 = false (Nein)
+#            1 = true (Ja)
+###############################################################################
+function ask_yes_or_no () {
+  echo -e -n " $1 [${bold_yellow}j${colors_off}]a oder [${bold_yellow}n${colors_off}]ein? "
+  IYN_RESULT=0
+  ANSWER=""
+  while [ "$ANSWER" = "" ];
+  do
+    read -N 1 -r -s ANSWER
+    ANSWER=$(echo $ANSWER | sed 's/[^JjNn]*//g')
+  done
+  echo -e "$ANSWER"
+  if [ "$ANSWER" = "J" ] ||
+     [ "$ANSWER" = "j" ];
+  then
+    IYN_RESULT=1
+  fi
+  return $IYN_RESULT
+}
+
+echo -e ""
+echo -e " ${bold_white}Quick Disk Copy v$VERSION${colors_off}"
+echo -e ""
+if [ $(id -u) -ne 0 ];
+then
+  echo -e " Bitte als Superuser aufrufen!"
+  exit 1
+fi
+
+if [ -f "/usr/sbin/ocs-onthefly" ];
+then
+  declare -A device_list
+  i=0
+  device_letters=(a b c d e f g h i j k l m n o p q r s t u v w x y z)
+  for x in ${device_letters[@]};
+  do
+    device_name="/dev/sd$x"
+    if [ -b "${device_name}1" ];
+    then
+      device_list[$i]="$x"
+      ((i+=1))
+    fi
+  done
+  if [ $i -lt 2 ];
+  then
+    echo -e " $ERROR_TAG: Kein Gerät zum Kopieren gefunden!"
+    exit 1
+  fi
+  x=0
+  while [ $x -lt $i ];
+  do
+    echo -e -n " [${bold_white}${device_list[$x]}${colors_off}] sd${device_list[$x]}"
+    DEVICE_NAME="/dev/sd${device_list[$x]}"
+    DISK_MODEL=$(LANG=en smartctl -i -d sat ${DEVICE_NAME} 2>/dev/null | grep -i -E "device\s*model" | cut -d":" -f 2 | xargs)
+    if [ "$DISK_MODEL" = "" ];
+    then
+      DISK_MODEL=$(LANG=en lsblk -S -o model ${DEVICE_NAME} 2>/dev/null | awk 'NR>1')
+    fi
+    if [ "$DISK_MODEL" = "" ];
+    then
+      DISK_MODEL=$(LANG=en parted ${DEVICE_NAME} print 2>/dev/null | grep -i -E "^model" | cut -d":" -f 2)
+    fi
+    DISK_MODEL=${DISK_MODEL:0:40}
+    DISK_MODEL=$(echo ${DISK_MODEL//_/ } | xargs)
+    DISK_SERIAL=$(LANG=en smartctl -i -d sat ${DEVICE_NAME} 2>/dev/null | grep -i -E "serial\s*number" | cut -d":" -f 2 | xargs)
+    echo -e -n " - $DISK_MODEL"
+    if [ "$DISK_SERIAL" != "" ];
+    then
+      echo -e -n " ($DISK_SERIAL)"
+    fi
+    echo -e ""
+    ((x+=1))
+  done
+  echo -e ""
+  echo -e -n " Bitte ${bold_white}Quelle${colors_off} auswählen: "
+  source_device=""
+  source_select=0
+  while [ $source_select -eq 0 ];
+  do
+    read -N 1 -r -s source_device
+    source_device="sd$source_device"
+    x=0
+    while [ $x -lt $i ];
+    do
+      if [ "$source_device" == "sd${device_list[$x]}" ];
+      then
+        source_select=1
+      fi
+      ((x+=1))
+    done
+  done
+  echo -e "${bold_white}$source_device${colors_off}"
+  echo -e -n " Bitte ${bold_white}Ziel${colors_off} auswählen: "
+  dest_device=""
+  dest_select=0
+  while [ $dest_select -eq 0 ];
+  do
+    read -N 1 -r -s dest_device
+    dest_device="sd$dest_device"
+    x=0
+    while [ $x -lt $i ];
+    do
+      if [ "$dest_device" == "sd${device_list[$x]}" ] &&
+         [ "$dest_device" != "$source_device" ];
+      then
+        dest_select=1
+      fi
+      ((x+=1))
+    done
+  done
+  echo -e "  ${bold_white}$dest_device${colors_off}"
+  echo -e ""
+  ask_yes_or_no "Wirklich ${bold_yellow}$source_device${colors_off} auf ${bold_yellow}$dest_device${colors_off} kopieren?"
+  if [ $? -eq 1 ];
+  then
+    # Eingehängte Partitionen aushängen
+    umount "/dev/$source_device"* &>/dev/null
+    umount "/dev/$dest_device"* &>/dev/null
+    # Partitionen kopieren
+    echo -e " Starte Kopiervorgang von ${bold_yellow}$source_device${colors_off} nach ${bold_yellow}$dest_device${colors_off} ..."
+    echo -e "$FULL_LINE"
+    /usr/sbin/ocs-onthefly -e1 auto -e2 -icds -j2 -nogui -pa command -sfsck -f ${source_device} -t ${dest_device}
+    OCS_RESULT=$?
+    echo -e "$FULL_LINE"
+    if [ $OCS_RESULT -eq 0 ];
+    then
+      # Bootloader kopieren (wird zuvor durch ocs-onthefly auf dem Ziel gelöscht bzw. überschrieben)
+      echo -e -n " Kopiere Bootloader ... "
+      dd if=/dev/${source_device} of=/dev/${dest_device} bs=512 count=4 &>/dev/null
+      if [ $? -eq 0 ];
+      then
+        echo -e "$OK_TAG, alles erledigt."
+      else
+        echo -e "$ERROR_TAG"
+      fi
+    else
+      echo -e " $ERROR_TAG: Der Kopiervorgang war nicht erfolgreich!"
+    fi
+  fi
+else
+  echo -e " $ERROR_TAG: ${bold_yellow}/usr/sbin/ocs-onthefly${colors_off} nicht gefunden!"
+fi

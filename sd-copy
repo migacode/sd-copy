@@ -35,8 +35,8 @@
 #   https://migano.de oder per E-Mail an >> kontakt@migano.de <<. Danke.      #
 #                                                                             #
 ###############################################################################
-VERSION="1.19"
-# Letzte Änderung: 26.10.2023
+VERSION="1.20"
+# Letzte Änderung: 09.02.2025
 ###############################################################################
 
 ###############################################################################
@@ -529,12 +529,13 @@ then
     if [ $deep_mode -ne 1 ];
     then
       # echo -e "/usr/sbin/ocs-onthefly -batch -e1 auto -e2 -icds -j2 -nogui -pa command -sfsck -f ${source_device} -t ${dest_device}" # NUR ZUM TESTEN
-      /usr/sbin/ocs-onthefly -batch -e1 auto -e2 -icds -j2 -nogui -pa true --source ${source_device} --target ${dest_device}
+      /usr/sbin/ocs-onthefly -batch -e1 auto -e2 -icds -iui -ius -j2 -rvd -nogui -pa true --source ${source_device} --target ${dest_device}
       COPY_RESULT=$?
       echo -e "$FULL_LINE"
       if [ $COPY_RESULT -eq 0 ];
       then
-        # Bootloader kopieren (wird zuvor durch ocs-onthefly auf dem Ziel gelöscht bzw. überschrieben)
+        # Bootloader kopieren (wird zuvor durch ocs-onthefly auf dem Ziel gelöscht bzw.
+        # überschrieben, obwohl die Option -j2 das eigentlich von selbst tun sollte ...)
         echo -e -n " Kopiere Bootloader ... "
         # echo -e "dd if=/dev/${source_device} of=/dev/${dest_device} bs=512 count=4 &>/dev/null" # NUR ZUM TESTEN
         dd if=/dev/${source_device} of=/dev/${dest_device} bs=512 count=4 &>/dev/null
@@ -548,7 +549,7 @@ then
       fi
     else
       # echo -e "dd conv=noerror if=/dev/${source_device} of=/dev/${dest_device} status=progress" # NUR ZUM TESTEN
-      dd conv=noerror if=/dev/${source_device} of=/dev/${dest_device} status=progress
+      dd conv=noerror,sync if=/dev/${source_device} of=/dev/${dest_device} status=progress
       COPY_RESULT=$?
     fi
     echo -e "$FULL_LINE"

@@ -35,9 +35,19 @@
 #   https://migano.de oder per E-Mail an >> kontakt@migano.de <<. Danke.      #
 #                                                                             #
 ###############################################################################
-VERSION="1.20"
-# Letzte Änderung: 09.02.2025
+VERSION="1.30"
+# Letzte Änderung: 25.02.2025
 ###############################################################################
+
+###############################################################################
+# Kommandozeilen-Optionen einlesen
+###############################################################################
+DEFAULT_DEEPMODE="n"
+for arg in $@;
+do
+  arg=$(printf %b "${arg}" | tr A-Z a-z)
+  if [ "$arg" == "--deep" ] || [ "$arg" == "-d" ]; then DEFAULT_DEEPMODE="j"; fi
+done
 
 ###############################################################################
 # Schriftfarben und Textbausteine
@@ -105,14 +115,30 @@ ERROR_TAG="${bold_red}Fehler${colors_off}"
 # Funktion zur einfachen Ja/Nein-Abfrage
 # Rückgaben: 0 = false (Nein)
 #            1 = true (Ja)
+# Eine Antwort-Vorgabe (default) kann bei Aufruf mit Parameter 2 gesetzt werden
 ###############################################################################
 function ask_yes_or_no () {
-  echo -e -n " $1 [${bold_yellow}j${colors_off}]a oder [${bold_yellow}n${colors_off}]ein? "
+  echo -e -n " $1 [${bold_yellow}"
+  if [ "$2" == "J" ] || [ "$2" == "j" ];
+  then
+    echo -e -n "J"
+  else
+    echo -e -n "j"
+  fi
+  echo -e -n "${colors_off}]a oder [${bold_yellow}"
+  if [ "$2" == "N" ] || [ "$2" == "n" ];
+  then
+    echo -e -n "N"
+  else
+    echo -e -n "n"
+  fi
+  echo -e -n "${colors_off}]ein? "
   IYN_RESULT=0
   ANSWER=""
   while [ "$ANSWER" = "" ];
   do
     read -N 1 -r -s ANSWER
+    if [[ $ANSWER == $'\n' ]]; then ANSWER="$2"; fi
     ANSWER=$(echo $ANSWER | sed 's/[^JjNn]*//g')
   done
   echo -e "$ANSWER"
@@ -457,7 +483,7 @@ then
   echo -e " kann der Deep-Mode (Klonen mit dd) verwendet werden, was je nach Belegung"
   echo -e " allerdings sehr viel länger (einige Stunden) dauern kann!"
   echo -e ""
-  ask_yes_or_no "Soll der Deep-Mode verwendet werden?"
+  ask_yes_or_no "Soll der Deep-Mode verwendet werden?" "$DEFAULT_DEEPMODE"
   deep_mode=$?
   echo -e -n " ${bold_white}OK${colors_off}, also "
   if [ $deep_mode -eq 1 ];
@@ -473,13 +499,13 @@ else
 fi
 echo -e ""
 echo -e " Sorry, die obligatorische Sicherheits-Frage muss ich natürlich noch stellen:"
-ask_yes_or_no "Soll ${bold_yellow}$source_device${colors_off} auf ${bold_yellow}$dest_device${colors_off} kopiert werden?"
+ask_yes_or_no "Soll ${bold_yellow}$source_device${colors_off} auf ${bold_yellow}$dest_device${colors_off} kopiert werden?" ""
 if [ $? -eq 1 ];
 then
   echo -e ""
   echo -e " Zur Sicherheit noch ein letztes Mal - versprochen, danach geht's sofort los!"
   echo -e " $ACHTUNG_TAG: ALLE Daten auf ${bold_white}$dest_device${colors_off} werden UNWIEDERBRINGLICH gelöscht!"
-  ask_yes_or_no "Jetzt wirklich ${bold_yellow}$source_device${colors_off} auf ${bold_yellow}$dest_device${colors_off} kopieren?"
+  ask_yes_or_no "Jetzt wirklich ${bold_yellow}$source_device${colors_off} auf ${bold_yellow}$dest_device${colors_off} kopieren?" ""
   if [ $? -eq 1 ];
   then
     # ----------------------------------
@@ -537,8 +563,8 @@ then
         # Bootloader kopieren (wird zuvor durch ocs-onthefly auf dem Ziel gelöscht bzw.
         # überschrieben, obwohl die Option -j2 das eigentlich von selbst tun sollte ...)
         echo -e -n " Kopiere Bootloader ... "
-        # echo -e "dd if=/dev/${source_device} of=/dev/${dest_device} bs=512 count=4 &>/dev/null" # NUR ZUM TESTEN
-        dd if=/dev/${source_device} of=/dev/${dest_device} bs=512 count=4 &>/dev/null
+        # echo -e "dd conv=noerror,sync if=/dev/${source_device} of=/dev/${dest_device} bs=512 count=4 &>/dev/null" # NUR ZUM TESTEN
+        dd conv=noerror,sync if=/dev/${source_device} of=/dev/${dest_device} bs=512 count=4 &>/dev/null
         COPY_RESULT=$?
         if [ $COPY_RESULT -eq 0 ];
         then
@@ -548,7 +574,7 @@ then
         fi
       fi
     else
-      # echo -e "dd conv=noerror if=/dev/${source_device} of=/dev/${dest_device} status=progress" # NUR ZUM TESTEN
+      # echo -e "dd conv=noerror,sync if=/dev/${source_device} of=/dev/${dest_device} status=progress" # NUR ZUM TESTEN
       dd conv=noerror,sync if=/dev/${source_device} of=/dev/${dest_device} status=progress
       COPY_RESULT=$?
     fi

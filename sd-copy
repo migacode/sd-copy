@@ -1,57 +1,257 @@
 #!/bin/bash
-###############################################################################
-#                                                                             #
-#                              Simple Disk Copy                               #
-#        ------------------------------------------------------------         #
-#         Simple Shell-Frontend for ocs-onthefly (Clonezilla) and dd          #
-#                                                                             #
-#                       (C)opyright bei Michael Gasbers                       #
-#                      MIGANO Professional Web Solutions                      #
-#                                                                             #
-#                             All rights reserved.                            #
-#                                                                             #
-###############################################################################
-#                                                                             #
-# DIESE SOFTWARE WIRD OHNE MÄNGELGEWÄHR UND OHNE JEGLICHE AUSDRÜCKLICHE ODER  #
-# STILLSCHWEIGENDE GARANTIE ZUR VERFÜGUNG GESTELLT, EINSCHLIESSLICH UND OHNE  #
-# EINSCHRÄNKUNG JEGLICHER GARANTIE FÜR DIE GEBRAUCHSTAUGLICHKEIT ODER EIGNUNG #
-# FÜR EINEN BESTIMMTEN ZWECK. ALLE RISIKEN IN BEZUG AUF ERGEBNISSE UND        #
-# LEISTUNG DIESER SOFTWARE WERDEN VOLLSTÄNDIG VOM BENUTZER ÜBERNOMMEN!        #
-#  *************************************************************************  #
-# THIS SOFTWARE IS PROVIDED "AS IS" WITH NO WARRANTIES WHAT SO EVER, WHETHER  #
-# EXPRESSED OR IMPLIED, INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF       #
-# USABILITY OR FITNESS FOR A PARTICULAR PURPOSE. ALL RISKS CONCERNING RESULTS #
-# AND PERFORMANCE OF THIS SOFTWARE ARE ASSUMED COMPLETELY BY THE USER!        #
-#                                                                             #
-###############################################################################
-#                                                                             #
-#  Jegliche Form der Kopie, Veränderung und kommerziellen Verbreitung dieses  #
-#  Scripts oder Teilen davon sowie des Quellcodes ist strengstens verboten!   #
-#  *************************************************************************  #
-#   Any form of copying, modification or commercial distribution of this      #
-#   script or any part thereof or it's sourcecode is strictly prohibited!     #
-#  *************************************************************************  #
-#   Für Anregungen und Fragen nehmen Sie bitte Kontakt mit uns auf über       #
-#   https://migano.de oder per E-Mail an >> kontakt@migano.de <<. Danke.      #
-#                                                                             #
-###############################################################################
-VERSION="1.30"
-# Letzte Änderung: 25.02.2025
-###############################################################################
+################################################################################
+#                                                                              #
+#                               Simple Disk Copy                               #
+#        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~        #
+#          Simple Shell-Frontend for ocs-onthefly (Clonezilla) and dd          #
+#                                                                              #
+#                       (C)opyright bei Michael Gasbers                        #
+#                             All rights reserved                              #
+#                                                                              #
+################################################################################
+#                                                                              #
+#  DIESE SOFTWARE WIRD OHNE MÄNGELGEWÄHR UND OHNE JEGLICHE AUSDRÜCKLICHE ODER  #
+#  STILLSCHWEIGENDE GARANTIE ZUR VERFÜGUNG GESTELLT, EINSCHLIESSLICH UND OHNE  #
+#  EINSCHRÄNKUNG JEGLICHER GARANTIE FÜR DIE GEBRAUCHSTAUGLICHKEIT ODER EIGNUNG #
+#  FÜR EINEN BESTIMMTEN ZWECK. ALLE RISIKEN IN BEZUG AUF ERGEBNISSE UND        #
+#  LEISTUNG DIESER SOFTWARE WERDEN VOLLSTÄNDIG VOM BENUTZER ÜBERNOMMEN!        #
+#  --------------------------------------------------------------------------  #
+#  THIS SOFTWARE IS PROVIDED "AS IS" WITH NO WARRANTIES WHAT SO EVER, WHETHER  #
+#  EXPRESSED OR IMPLIED, INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF       #
+#  USABILITY OR FITNESS FOR A PARTICULAR PURPOSE. ALL RISKS CONCERNING RESULTS #
+#  AND PERFORMANCE OF THIS SOFTWARE ARE ASSUMED COMPLETELY BY THE USER!        #
+#                                                                              #
+################################################################################
+#                                                                              #
+#  Jegliche Form der Kopie, Veränderung und Verwendung dieses Skripts sowie    #
+#  Teilen davon ist nur für rein private Zwecke erlaubt. Insbesondere eine     #
+#  Nutzung und Verbreitung für kommerzielle Zwecke ist strengstens verboten!   #
+#  --------------------------------------------------------------------------  #
+#  Any form of copying, modification and use of this script and parts thereof  #
+#  is only permitted for purely private purposes. In particular, any use and   #
+#  distribution for commercial purposes is strictly prohibited!                #
+#                                                                              #
+################################################################################
+#                                                                              #
+#  Dies und andere Tools sind auch zu finden auf: https://github.com/migacode  #
+#  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  #
+#   Für Anregungen und Fragen zu diesem Tool bitte Kontakt mit uns aufnehmen   #
+#   über https://migano.de oder per E-Mail an kontakt@migano.de. Danke.        #
+#                                                                              #
+################################################################################
+# Letzte Änderung: 22.03.2025
+VERSION="1.40"
 
-###############################################################################
-# Kommandozeilen-Optionen einlesen
-###############################################################################
-DEFAULT_DEEPMODE="n"
-for arg in $@;
-do
-  arg=$(printf %b "${arg}" | tr A-Z a-z)
-  if [ "$arg" == "--deep" ] || [ "$arg" == "-d" ]; then DEFAULT_DEEPMODE="j"; fi
-done
+################################################################################
+#
+#                            Funktionen definieren
+#
+################################################################################
+#===============================================================================
+# Einfache Ja/Nein-Abfrage
+# -------------------------
+# Parameter $1: Anzuzeigender Text
+# Parameter $2: Antwort-Vorgabe / Default (optional)
+# -----------
+# Rückgaben:
+# 0 = false (Nein)
+# 1 = true (Ja)
+#===============================================================================
+function ask_yes_or_no {
+  echo -e -n " $1 [${bold_yellow}"
+  if [ "$2" == "J" ] || [ "$2" == "j" ];
+  then
+    echo -e -n "J"
+  else
+    echo -e -n "j"
+  fi
+  echo -e -n "${colors_off}]a oder [${bold_yellow}"
+  if [ "$2" == "N" ] || [ "$2" == "n" ];
+  then
+    echo -e -n "N"
+  else
+    echo -e -n "n"
+  fi
+  echo -e -n "${colors_off}]ein? "
+  IYN_RESULT=0
+  ANSWER=""
+  while [ "$ANSWER" == "" ];
+  do
+    read -N 1 -r -s ANSWER
+    if [ "$ANSWER" == $'\n' ]; then ANSWER="$2"; fi
+    ANSWER=$(echo ${ANSWER} | sed 's/[^JjNn]*//g')
+  done
+  echo -e "$ANSWER"
+  if [ "$ANSWER" == "J" ] ||
+     [ "$ANSWER" == "j" ];
+  then
+    IYN_RESULT=1
+  fi
+  return $IYN_RESULT
+}
 
-###############################################################################
-# Schriftfarben und Textbausteine
-###############################################################################
+#===============================================================================
+# Download einer Bild-Datei (Pixmap)
+# -----------------------------------
+# Parameter $1: Dateiname (ohne Endung)
+#===============================================================================
+function download_icon_file {
+  PKG_PICTURE_NAME="$1.png"
+  PKG_PICTURE_DIR="/usr/share/pixmaps"
+  PKG_PICTURE_FILE="$PKG_PICTURE_DIR/$PKG_PICTURE_NAME"
+  if [ -d "$PKG_PICTURE_DIR" ] &&
+     [ ! -s "$PKG_PICTURE_FILE" ];
+  then
+    PKG_PICTURE_URL="$RESSOURCE_SERVER_DIR/png/$PKG_PICTURE_NAME"
+    LOCAL_DOWNLOAD_FILE="$DOWNLOAD_DIR/$PKG_PICTURE_NAME"
+    wget -nv -O "$LOCAL_DOWNLOAD_FILE" "$PKG_PICTURE_URL" &>/dev/null
+    DOWNLOAD_RESULT=$?
+    if [ $DOWNLOAD_RESULT -eq 0 ] &&
+       [ -s "$LOCAL_DOWNLOAD_FILE" ] &&
+       [ $(grep -i -c -E "Error\s*404" "$LOCAL_DOWNLOAD_FILE") -eq 0 ];
+    then
+      mv -f "$LOCAL_DOWNLOAD_FILE" "$PKG_PICTURE_FILE" &>/dev/null
+      chown -R "root:root" "$PKG_PICTURE_FILE" &>/dev/null
+      chmod -R 0644 "$PKG_PICTURE_FILE" &>/dev/null
+    else
+      rm -f "$LOCAL_DOWNLOAD_FILE" &>/dev/null
+    fi
+  fi
+}
+
+#===============================================================================
+# Erstellung einer Liste aller Disk-Devices oder wahlweise die Ermittlung nur
+# des ersten neuen "Buchstabens"
+# -------------------------------
+# Parameter $1:
+# 0 = Vollständige neue Liste erstellen (wird in device_list gespeichert)
+# 1 = Nur ersten neuen "Buchstaben" finden (wird in first_new_char gespeichert)
+#===============================================================================
+function get_disk_letter {
+  get_only_first_new=$1
+  first_new_char=""
+  devices_in_list=${#device_list[@]}
+  device_chars_list=({a..z})
+  for device_char in ${device_chars_list[@]};
+  do
+    if [ $get_only_first_new -ne 1 ] ||
+       [ "$first_new_char" == "" ];
+    then
+      if [ "sd${device_char}" != "$boot_device" ] &&
+         [ -b "/dev/sd${device_char}1" ];
+      then
+        already_exists=0
+        c=0
+        while [ $c -lt $devices_in_list ] &&
+              [ $already_exists -eq 0 ];
+        do
+          if [ "${device_char}" == "${device_list[$c]}" ];
+          then
+            already_exists=1
+          fi
+          ((c+=1))
+        done
+        if [ $already_exists -eq 0 ];
+        then
+          first_new_char="$device_char"
+          device_list[${devices_in_list}]="$device_char"
+          devices_in_list=${#device_list[@]}
+        fi
+      fi
+    fi
+  done
+}
+
+#===============================================================================
+# Einfügung von Leerzeichen
+# --------------------------
+# Parameter $1: Anzahl
+#===============================================================================
+function insert_spaces {
+  i=1
+  while [ $i -le $1 ];
+  do
+    echo -e -n " "
+    ((i+=1))
+  done
+}
+
+#===============================================================================
+# Ermittlung und Anzeige der Hardware-Informationen zu einer Disk
+# ----------------------------------------------------------------
+# Parameter $1: Device-Name (ohne Pfad, bspw. sda)
+#===============================================================================
+function show_disk_info {
+  if smartctl --version &>/dev/null;
+  then
+    DEVICE_NAME="/dev/$1"
+    # ---------------------------------------
+    # Maximale Länge jeder Teil-Zeichenfolge
+    # ---------------------------------------
+    MAX_INFO_LENGTH=24
+    # --------------------
+    # Hersteller (Family)
+    # --------------------
+    DISK_FAMILY=$(smartctl -x ${DEVICE_NAME} 2>/dev/null | grep -i -E "Model\s*Family" | sed -E "s/Model\s*Family\s*:*//i" | xargs)
+    if [ ${#DISK_FAMILY} -gt $MAX_INFO_LENGTH ]; then DISK_FAMILY=${DISK_FAMILY:0:$MAX_INFO_LENGTH}; fi
+    # --------------------
+    # Bezeichnung (Model)
+    # --------------------
+    DISK_MODEL=$(LANG=en smartctl -i -d sat ${DEVICE_NAME} 2>/dev/null | grep -i -E "device\s*model" | cut -d":" -f 2 | xargs)
+    if [ "$DISK_MODEL" == "" ];
+    then
+      DISK_MODEL=$(LANG=en lsblk -S -o model ${DEVICE_NAME} 2>/dev/null | awk 'NR>1' | xargs)
+    fi
+    if [ "$DISK_MODEL" == "" ];
+    then
+      DISK_MODEL=$(LANG=en parted -s ${DEVICE_NAME} print 2>/dev/null | grep -i -E "^model" | cut -d":" -f 2 | xargs)
+    fi
+    DISK_MODEL=$(echo ${DISK_MODEL//_/ } | xargs)
+    if [ ${#DISK_MODEL} -gt $MAX_INFO_LENGTH ]; then DISK_MODEL=${DISK_MODEL:0:$MAX_INFO_LENGTH}; fi
+    # ----------------------
+    # Seriennummer (Serial)
+    # ----------------------
+    DISK_SERIAL=$(LANG=en smartctl -i -d sat ${DEVICE_NAME} 2>/dev/null | grep -i -E "serial\s*number" | cut -d":" -f 2 | xargs)
+    if [ "$DISK_SERIAL" == "" ];
+    then
+      if udevadm --version &>/dev/null;
+      then
+        DISK_SERIAL=$(LANG=en udevadm info --name=${DEVICE_NAME} | grep -i -E "\s*E:\s*ID_SERIAL_SHORT\s*=" | head -n 1 | sed -E "s/\s*E:\s*ID_SERIAL_SHORT\s*=//i" | xargs)
+      fi
+    fi
+    if [ ${#DISK_SERIAL} -gt $MAX_INFO_LENGTH ]; then DISK_SERIAL=${DISK_SERIAL:(-$MAX_INFO_LENGTH):$MAX_INFO_LENGTH}; fi
+    # ------------------
+    # Start der Ausgabe
+    # ------------------
+    echo -e -n " -"
+    if [ "$DISK_MODEL"  != "" ]; then echo -e -n  " ${light_blue}$DISK_MODEL${colors_off}"; fi
+    if [ "$DISK_SERIAL" != "" ]; then echo -e -n  " ${light_blue}[$DISK_SERIAL]${colors_off}"; fi
+    # if [ "$DISK_FAMILY" != "" ]; then echo -e -n  " ${light_blue}$DISK_FAMILY${colors_off}"; fi
+  else
+    echo -e -n " (keine Angaben)"
+  fi
+}
+
+################################################################################
+#
+#                             Variablen definieren
+#
+################################################################################
+#===============================================================================
+# Pfad-Angaben zu uns selbst (aufgerufenes Skript)
+#===============================================================================
+SCRIPT_PATH="$(pwd)"
+SCRIPT_NAME="${0##*/}"
+
+#===============================================================================
+# Server-Verzeichnis, aus welchem zur Laufzeit dieses Skriptes weitere frei
+# zugängliche (per URL direkt erreichbare) Ressourcen heruntergeladen werden.
+#===============================================================================
+RESSOURCE_SERVER_DIR="https://migano.de/download/sd-copy"
+
+#===============================================================================
+# Schriftfarben
+#===============================================================================
 # Text normal
 black='\033[0;30m'
 red='\033[0;31m'
@@ -102,155 +302,92 @@ colors_off='\033[0m'
 colors_invers='\033[7m'
 # Linienfarbe
 line_color='\033[0;90m'
-
+#===============================================================================
+# Textbausteine
+#===============================================================================
+# Trennzeilen
 FULL_LINE="${line_color}$(printf '─%.0s' {1..80})${colors_off}"
+HALF_LINE="${line_color}$(printf '─%.0s' {1..40})${colors_off}"
 FULLSPACE=$(printf '\x20%.0s' {1..80})
-
-OK_TAG="${bold_green}ok${colors_off}"
-HINWEIS_TAG="${bold_blue}Hinweis${colors_off}"
+# Kopfzeilen
+HEADLINE_TEXT="${bold_white}${bg_blue}"
+HEADLINE_TEXT+="$FULLSPACE"$'\n'
+HEADLINE_TEXT+="$(printf '\x20%.0s' {1..32})Simple Disk Copy$(printf '\x20%.0s' {1..32})"$'\n'
+HEADLINE_TEXT+="${light_blue}${bg_blue}"
+HEADLINE_TEXT+="$(printf '\x20%.0s' {1..37})v $VERSION$(printf '\x20%.0s' {1..37})"$'\n'
+HEADLINE_TEXT+="$FULLSPACE"
+HEADLINE_TEXT+="${colors_off}"
+# Sonstige Texte
+CANCEL_TEXT="Abbruch durch Benutzer."
+# Text-Tags
 ACHTUNG_TAG="${bold_yellow}Achtung${colors_off}"
 ERROR_TAG="${bold_red}Fehler${colors_off}"
+HINWEIS_TAG="${bold_blue}Hinweis${colors_off}"
+OK_TAG="${bold_green}ok${colors_off}"
 
-###############################################################################
-# Funktion zur einfachen Ja/Nein-Abfrage
-# Rückgaben: 0 = false (Nein)
-#            1 = true (Ja)
-# Eine Antwort-Vorgabe (default) kann bei Aufruf mit Parameter 2 gesetzt werden
-###############################################################################
-function ask_yes_or_no () {
-  echo -e -n " $1 [${bold_yellow}"
-  if [ "$2" == "J" ] || [ "$2" == "j" ];
+################################################################################
+#
+#                                Here we go ...
+#
+################################################################################
+#===============================================================================
+# Eigenen Benutzernamen und Benutzer-ID ermitteln
+#===============================================================================
+if [ $SUDO_USER ]; then USER_USERNAME="$SUDO_USER"; else USER_USERNAME=$(whoami); fi
+USER_UID=$(id -u $USER_USERNAME)
+
+#===============================================================================
+# Ordner zur Speicherung von Downloads festlegen
+# ACHTUNG: Angaben OHNE Slash(/) am Ende!
+#===============================================================================
+if [ "$USER_USERNAME" == "root" ];
+then
+  USER_HOME_DIR="/root"
+  DOWNLOAD_DIR="/tmp/$SCRIPT_NAME"
+else
+  USER_HOME_DIR="/home/$USER_USERNAME"
+  DOWNLOAD_DIR="$USER_HOME_DIR/Downloads/$SCRIPT_NAME"
+fi
+DOWNLOAD_DIR+="_files"
+if [ ! -d "$DOWNLOAD_DIR" ];
+then
+  mkdir -p "$DOWNLOAD_DIR" &>/dev/null
+  if [ $? -eq 0 ];
   then
-    echo -e -n "J"
-  else
-    echo -e -n "j"
+    chown -R "$USER_USERNAME:$USER_USERNAME" "$DOWNLOAD_DIR" &>/dev/null
+    chmod -R 0755 "$DOWNLOAD_DIR" &>/dev/null
   fi
-  echo -e -n "${colors_off}]a oder [${bold_yellow}"
-  if [ "$2" == "N" ] || [ "$2" == "n" ];
+fi
+
+#===============================================================================
+# Desktop-Ordner des Benutzers (zur Erstellung des Programmsymbols / Icons)
+# ACHTUNG: Angaben OHNE Slash (/) am Ende!
+#===============================================================================
+DESKTOP_DIR=""
+if [ -d "/home/$USER_USERNAME/Schreibtisch" ];
+then
+  DESKTOP_DIR="/home/$USER_USERNAME/Schreibtisch"
+else
+  if [ -d "/home/$USER_USERNAME/Desktop" ];
   then
-    echo -e -n "N"
-  else
-    echo -e -n "n"
+    DESKTOP_DIR="/home/$USER_USERNAME/Desktop"
   fi
-  echo -e -n "${colors_off}]ein? "
-  IYN_RESULT=0
-  ANSWER=""
-  while [ "$ANSWER" = "" ];
-  do
-    read -N 1 -r -s ANSWER
-    if [[ $ANSWER == $'\n' ]]; then ANSWER="$2"; fi
-    ANSWER=$(echo $ANSWER | sed 's/[^JjNn]*//g')
-  done
-  echo -e "$ANSWER"
-  if [ "$ANSWER" = "J" ] ||
-     [ "$ANSWER" = "j" ];
-  then
-    IYN_RESULT=1
-  fi
-  return $IYN_RESULT
-}
+fi
 
-###############################################################################
-# Funktion zur Erstellung wahlweise eine Liste aller Disk-Devices oder
-# Ermittlung nur des ersten neuen "Buchstabens"
-# Parameter:
-# 0 = Vollständige neue Liste erstellen (wird in device_list gespeichert)
-# 1 = Nur ersten neuen "Buchstaben" finden (wird in first_new_char gespeichert)
-###############################################################################
-function get_disk_letter () {
-  get_only_first_new=$1
-  first_new_char=""
-  devices_in_list=${#device_list[@]}
-  device_chars_list=(a b c d e f g h i j k l m n o p q r s t u v w x y z)
-  for device_char in ${device_chars_list[@]};
-  do
-    if [ $get_only_first_new -ne 1 ] ||
-       [ "$first_new_char" == "" ];
-    then
-      if [ "sd${device_char}" != "$boot_device" ] &&
-         [ -b "/dev/sd${device_char}1" ];
-      then
-        already_exists=0
-        c=0
-        while [ $c -lt $devices_in_list ] &&
-              [ $already_exists -eq 0 ];
-        do
-          if [ "${device_char}" == "${device_list[$c]}" ];
-          then
-            already_exists=1
-          fi
-          ((c+=1))
-        done
-        if [ $already_exists -eq 0 ];
-        then
-          first_new_char="$device_char"
-          device_list[${devices_in_list}]="$device_char"
-          devices_in_list=${#device_list[@]}
-        fi
-      fi
-    fi
-  done
-}
-
-###############################################################################
-# Funktion zur Ermittlung der Hardware-Informationen zu einer Disk
-###############################################################################
-function show_disk_info () {
-  if smartctl --version &>/dev/null;
-  then
-    DEVICE_NAME="/dev/$1"
-    DISK_MODEL=$(LANG=en smartctl -i -d sat ${DEVICE_NAME} 2>/dev/null | grep -i -E "device\s*model" | cut -d":" -f 2 | xargs)
-    if [ "$DISK_MODEL" == "" ];
-    then
-      DISK_MODEL=$(LANG=en lsblk -S -o model ${DEVICE_NAME} 2>/dev/null | awk 'NR>1' | xargs)
-    fi
-    if [ "$DISK_MODEL" == "" ];
-    then
-      DISK_MODEL=$(LANG=en parted -s ${DEVICE_NAME} print 2>/dev/null | grep -i -E "^model" | cut -d":" -f 2 | xargs)
-    fi
-    DISK_MODEL=${DISK_MODEL:0:40}
-    DISK_MODEL=$(echo ${DISK_MODEL//_/ } | xargs)
-    DISK_SERIAL=$(LANG=en smartctl -i -d sat ${DEVICE_NAME} 2>/dev/null | grep -i -E "serial\s*number" | cut -d":" -f 2 | xargs)
-    echo -e -n " - $DISK_MODEL"
-    if [ "$DISK_SERIAL" != "" ];
-    then
-      echo -e -n " ($DISK_SERIAL)"
-    fi
-  else
-    echo -e -n " (keine Angaben)"
-  fi
-}
-
-###############################################################################
-# Funktion zur Einfügung von Leerzeichen
-###############################################################################
-function insert_spaces () {
-  i=1
-  while [ $i -lt $1 ];
-  do
-    echo -e -n " "
-    ((i+=1))
-  done
-}
-
-# ---------------------------------------------------------------------------
-# Here we go ...
-# ---------------------------------------------------------------------------
+#===============================================================================
+# Kopfzeile ausgeben
+#===============================================================================
 printf %b '\e]10;#eeeeee\a' # Schriftfarbe (VT100) immer hell ;)
 printf %b '\e]11;#242628\a' # Hintergrundfarbe (VT100) immer dunkel ;)
 clear
-
-HEADLINE_TEXT="${bold_white}${bg_blue}"
-HEADLINE_TEXT+="$FULLSPACE"$'\n'
-HEADLINE_TEXT+="                                Simple Disk Copy                                "$'\n'
-HEADLINE_TEXT+="${light_blue}${bg_blue}"
-HEADLINE_TEXT+="                                     v $VERSION                                     "$'\n'
-HEADLINE_TEXT+="$FULLSPACE"
-HEADLINE_TEXT+="${colors_off}"
 echo -e "$HEADLINE_TEXT"
 echo -e ""
 echo -e " Erstellt \"on-the-fly\" eine vollständige Kopie eines Speichermediums auf ein"
 echo -e " anderes Medium. Dazu müssen beide Speichermedien physisch angeschlossen sein."
+
+#===============================================================================
+# Aufruf als Superuser prüfen
+#===============================================================================
 if [ $(id -u) -ne 0 ];
 then
   echo -e ""
@@ -258,56 +395,86 @@ then
   exit 1
 fi
 
-# ---------------------------------------------------------------------------
-# Erforderlische Komponenten prüfen und ggf. nachinstallieren
-# ---------------------------------------------------------------------------
-echo -e ""
-echo -e " Prüfe System-Voraussetzungen: "
-
-required_errors=0
-required_packages=('clonezilla' 'smartmontools' 'util-linux')
-for required_pkg in ${required_packages[@]};
+#===============================================================================
+# Kommandozeilen-Optionen einlesen
+#===============================================================================
+DEFAULT_DEEPMODE="n"
+for arg in $@;
 do
-  echo -e -n " Modul ${bold_cyan}$required_pkg${colors_off}"
-  ((ANZ_SPACES=14-${#required_pkg}))
-  insert_spaces $ANZ_SPACES
-  echo -e -n " ... "
-  if # [ $(LANG=en apk list "$required_pkg" 2>/dev/null | grep -i -c -E "\[installed\]") -eq 0 ] &&
-     [ $(LANG=en dpkg-query -W -f='${Status}' "$required_pkg" 2>/dev/null | grep -i -c -E "ok installed") -eq 0 ];
-  then
-    echo -e -n " wird installiert ... "
-    # if apk --version &>/dev/null;
-    # then
-    #   apk add "$required_pkg" &>/dev/null
-    # else
-      apt install "$required_pkg" -y &>/dev/null
-    # fi
-    if [ $? -eq 0 ];
-    then
-      echo -e "$OK_TAG"
-    else
-      ((required_errors+=1))
-      echo -e "$ERROR_TAG"
-    fi
-  else
-    echo -e "$OK_TAG"
-  fi
+  arg=$(printf %b "${arg}" | tr A-Z a-z)
+  if [ "$arg" == "--deep" ] || [ "$arg" == "-d" ]; then DEFAULT_DEEPMODE="j"; fi
 done
 
+#===============================================================================
+# Erforderliche Komponenten prüfen und ggf. nachinstallieren
+#===============================================================================
+echo -e ""
+echo -e " Prüfe System-Voraussetzungen:"
+required_packages=('clonezilla' 'smartmontools' 'util-linux')
+# -------------
+# Schnell-Test
+# -------------
+ALL_COMPONENTS_INSTALLED=1
+for required_pkg in ${required_packages[@]};
+do
+  ((ANZ_SPACES=12-${#required_pkg}))
+  if [ $(LANG=en dpkg-query -W -f='${Status}' "$required_pkg" 2>/dev/null | grep -i -c -E "ok installed") -eq 0 ];
+  then
+    ALL_COMPONENTS_INSTALLED=0
+    break
+  fi
+done
+# ---------------------------------------------------
+# Wenn alle benötigten Komponenten installiert sind,
+# nur eine kurze Meldung anzeigen ...
+# ---------------------------------------------------
+required_errors=0
+if [ $ALL_COMPONENTS_INSTALLED -eq 1 ];
+then
+  echo -e " Alle benötigten Komponenten sind installiert ... $OK_TAG"
+# ------------------------------------------------------------------
+# ... sonst alle Komponenten anzeigen und fehlende installieren ...
+# ------------------------------------------------------------------
+else
+  for required_pkg in ${required_packages[@]};
+  do
+    echo -e -n " Modul ${bold_cyan}$required_pkg${colors_off}"
+    ((ANZ_SPACES=13-${#required_pkg}))
+    insert_spaces $ANZ_SPACES
+    echo -e -n " ... "
+    if [ $(LANG=en dpkg-query -W -f='${Status}' "$required_pkg" 2>/dev/null | grep -i -c -E "ok installed") -eq 0 ];
+    then
+      echo -e -n "wird installiert ... "
+      apt install "$required_pkg" -y &>/dev/null
+      if [ $? -eq 0 ];
+      then
+        echo -e "$OK_TAG"
+      else
+        ((required_errors+=1))
+        echo -e "$ERROR_TAG"
+      fi
+    else
+      echo -e "$OK_TAG"
+    fi
+  done
+fi
+
+#===============================================================================
+# Wichtige Hinweise anzeigen und Skript bei fehlenden Komponenten ggf. beenden
+#===============================================================================
 if ! lsblk --version &>/dev/null;
 then
-  echo -e " "
+  echo -e ""
   echo -e " $ACHTUNG_TAG: Leider stehen auf diesem System nicht alle benötigten Komponenten"
   echo -e " zur Verfügung (util-linux). Das Skript wird daher jetzt beendet."
   echo -e ""
   exit 1
 fi
-
-# boot_device="$(df /boot 2>/dev/null | grep -Eo "/dev/[^ ]+" | sed -E "s/\/dev\///" | sed -E "s/[0-9]//")"# Ubuntu only
-# boot_device="$(lsblk -n -o pkname $(findmnt -n / 2>/dev/null | awk '{ print $2 }'))" # util-linux (works not on HA)
-boot_device="$(findmnt -n / 2>/dev/null | awk '{ print $2 }' | sed -E "s/\/dev\///" | sed -E "s/[0-9]//")" # util-linux
-echo -e " System gebootet von ... ${bold_purple}$boot_device${colors_off}"
-
+boot_device="$(findmnt -n / 2>/dev/null | awk '{ print $2 }' | sed -E "s/\/dev\///" | sed -E "s/[0-9]//")"
+echo -e ""
+echo -e -n " System gebootet von ... ${bold_purple}$boot_device${colors_off}${light_blue}"
+show_disk_info "$boot_device"
+echo -e "${colors_off}"
 if [ $required_errors -gt 0 ];
 then
   echo -e ""
@@ -315,24 +482,67 @@ then
   echo -e " stehen nicht alle Funktionen des Skripts zur Verfügung."
 fi
 
-# ---------------------------------------------------------------------------
+#===============================================================================
+# Starter für uns selbst auf dem Desktop anlegen
+#===============================================================================
+STARTER_FILE="$DESKTOP_DIR/$SCRIPT_NAME.desktop"
+if [ ! -s "$STARTER_FILE" ];
+then
+  echo -e ""
+  echo -e " $HINWEIS_TAG: Es scheint kein ${light_cyan}Starter${colors_off} für SD-Copy v$VERSION angelegt zu sein."
+  ask_yes_or_no "Jetzt Starter (Symbol) auf dem Desktop anlegen" "j"
+  if [ $? -eq 1 ];
+  then
+    echo -e -n " Erstelle Starter ... "
+    echo -e "[Desktop Entry]" > "$STARTER_FILE" 2>/dev/null
+    if [ $? -eq 0 ];
+    then
+      # ------------------
+      # Starter erstellen
+      # ------------------
+      echo -e "Type=Application" >> "$STARTER_FILE" 2>/dev/null
+      echo -e "Name=Simple Disk Copy\\\n(Terminal)" >> "$STARTER_FILE" 2>/dev/null
+      echo -e "Comment=Simple Disk Copy im Terminal starten" >> "$STARTER_FILE" 2>/dev/null
+      echo -e "Exec=bash -c 'cd $SCRIPT_PATH && sudo ./sd-copy;\$SHELL'" >> "$STARTER_FILE" 2>/dev/null
+      echo -e "Icon=sd-copy" >> "$STARTER_FILE" 2>/dev/null
+      echo -e "Categories=Application;" >> "$STARTER_FILE" 2>/dev/null
+      echo -e "Terminal=true" >> "$STARTER_FILE" 2>/dev/null
+      echo -e "StartupNotify=true" >> "$STARTER_FILE" 2>/dev/null
+      echo -e "NoDisplay=false" >> "$STARTER_FILE" 2>/dev/null
+      chown -R "$USER_USERNAME:$USER_USERNAME" "$STARTER_FILE" &>/dev/null
+      chmod -R 0755 "$STARTER_FILE" &>/dev/null
+      # --------------------------------
+      # Icon für den Starter downloaden
+      # --------------------------------
+      download_icon_file "sd-copy"
+      echo -e "$OK_TAG"
+    else
+      echo -e "$ERROR_TAG"
+    fi
+  fi
+fi
+
+#===============================================================================
 # Liste aller Disk-Devices erstellen
-# ---------------------------------------------------------------------------
+#===============================================================================
 declare -A device_list
 first_new_char=""
 get_disk_letter 0
 devices_in_list=${#device_list[@]}
 echo -e ""
-# ---------------------------------------------------------------------------
+
+#===============================================================================
 # Auswahl von Quelle und Ziel
-# A) Manuelle Auswahl (wenn mindestens 2 Disks angeschlossen sind)
-# ---------------------------------------------------------------------------
+#===============================================================================
+# ------------------------------------------------------------------------------
+# Manuelle Auswahl (wenn mindestens 2 Disks angeschlossen sind)
+# ------------------------------------------------------------------------------
 if [ $devices_in_list -gt 1 ];
 then
   do_auto_select=0
-  # ----------------------------------------------------------------
+  # ----------------------------------------------------------------------------
   # Auswahlliste anzeigen
-  # ----------------------------------------------------------------
+  # ----------------------------------------------------------------------------
   echo -e " Folgende Speichermedien sind gerade angeschlossen:"
   x=0
   while [ $x -lt $devices_in_list ];
@@ -345,9 +555,9 @@ then
   echo -e ""
   echo -e " Zur Auswahl die entsprechende Taste drücken, oder zum Start des interaktiven"
   echo -e " Modus mit selektivem Medien-Anschluss leere Eingabe machen (Enter drücken)."
-  # ----------------------------------------------------------------
+  # ----------------------------------------------------------------------------
   # Quelle auswählen
-  # ----------------------------------------------------------------
+  # ----------------------------------------------------------------------------
   echo -e ""
   echo -e -n " Bitte ${bold_white}Quelle${colors_off} auswählen: "
   source_device=""
@@ -375,9 +585,9 @@ then
       do_auto_select=1
     fi
   done
-  # ----------------------------------------------------------------
+  # ----------------------------------------------------------------------------
   # Wenn eine Quelle ausgewählt wurde, dann auch ein Ziel auswählen
-  # ----------------------------------------------------------------
+  # ----------------------------------------------------------------------------
   if [ $do_auto_select -eq 0 ];
   then
     echo -e -n "${bold_yellow}$source_device${colors_off}"
@@ -417,7 +627,6 @@ then
       echo -e ""
     fi
   fi
-  # ----------------------------------------------------------------
 else
   echo -e " $HINWEIS_TAG: Es wurden nicht genug angeschlossene Speichermedien zum Kopieren"
   echo -e " gefunden, daher wird jetzt automatisch der interaktive Modus gestartet."
@@ -425,14 +634,14 @@ else
   echo -e "$FULL_LINE"
   do_auto_select=1
 fi
-# ---------------------------------------------------------------------------
-# Auswahl von Quelle und Ziel
-# B) Interaktiver Modus (wenn weniger als 2 Disks angeschlossen
-#    sind, oder die manuelle Auswahl abgebrochen wurde)
-# ---------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# Interaktiver Modus (wenn weniger als 2 Disks angeschlossen sind,
+# oder die manuelle Auswahl abgebrochen wurde)
+# ------------------------------------------------------------------------------
 if [ $do_auto_select -eq 1 ];
 then
   echo -e " ${bold_white}Interaktiver Modus${colors_off}"
+  echo -e "$HALF_LINE"
   echo -e " $ACHTUNG_TAG: Bitte entferne zunächst vollständig das Quell- UND Ziel-Medium,"
   echo -e -n " sofern diese bereits angeschlossen sind, und drücke dann auf Enter ... "
   read -N 1 -r -s dummy
@@ -442,7 +651,7 @@ then
   echo -e ""
   echo -e " Die jeweiligen Medien werden nun bei Anschluss automatisch erkannt."
   echo -e ""
-  echo -e -n " Bitte ${bold_white}Quelle${colors_off} anschließen ... "
+  echo -e -n " Bitte ${bold_yellow}Quelle${colors_off} anschließen ... "
   new_disc_letter=""
   while [ "$new_disc_letter" == "" ];
   do
@@ -454,7 +663,7 @@ then
   echo -e -n "${bold_yellow}$source_device${colors_off}"
   show_disk_info "$source_device"
   echo -e ""
-  echo -e -n " Bitte ${bold_white}Ziel${colors_off} anschließen ...   "
+  echo -e -n " Bitte ${bold_yellow}Ziel${colors_off} anschließen ...   "
   new_disc_letter=""
   while [ "$new_disc_letter" == "" ];
   do
@@ -467,14 +676,19 @@ then
   show_disk_info "$dest_device"
   echo -e ""
 fi
-# ---------------------------------------------------------------------------
-# Sicherheitsabfragen
+
+#===============================================================================
+# Durchführung des Kopiervorgangs
+# -----------------------------------------------------------
 # Wenn Clonezilla nicht installiert ist, dann nur den Deep-Modus (dd)
 # zulassen. Ansonsten fragen, welcher Modus verwendet werden soll ...
-# ---------------------------------------------------------------------------
+#===============================================================================
 echo -e ""
 echo -e " ${bold_white}OK${colors_off}, ich bin bereit für den Kopier-Vorgang - nur noch eine Frage ..."
 echo -e ""
+# ------------------------------------------------------------------------------
+# Kopier-Modus abfragen / festlegen
+# ------------------------------------------------------------------------------
 if [ -f "/usr/sbin/ocs-onthefly" ];
 then
   echo -e " $HINWEIS_TAG: Im Standard werden nur die Sektoren kopiert, welche auch mit Daten"
@@ -498,6 +712,9 @@ else
   deep_mode=1
 fi
 echo -e ""
+# ------------------------------------------------------------------------------
+# Sicherheitsabfragen
+# ------------------------------------------------------------------------------
 echo -e " Sorry, die obligatorische Sicherheits-Frage muss ich natürlich noch stellen:"
 ask_yes_or_no "Soll ${bold_yellow}$source_device${colors_off} auf ${bold_yellow}$dest_device${colors_off} kopiert werden?" ""
 if [ $? -eq 1 ];
@@ -508,13 +725,15 @@ then
   ask_yes_or_no "Jetzt wirklich ${bold_yellow}$source_device${colors_off} auf ${bold_yellow}$dest_device${colors_off} kopieren?" ""
   if [ $? -eq 1 ];
   then
-    # ----------------------------------
+    # --------------------------------------------------------------------------
     # Eingehängte Partitionen aushängen
-    # ----------------------------------
+    # --------------------------------------------------------------------------
     echo -e ""
     echo -e -n " Hänge alle betroffenen Partitionen aus ... "
     UMOUNTS_RESULT=0
-    # Alle Partitionen des Quell-Medums
+    # -----------------------------------
+    # Alle Partitionen des Quell-Mediums
+    # -----------------------------------
     p=1;
     while [ $p -lt 100 ] &&
           [ $UMOUNTS_RESULT -eq 0 ];
@@ -526,7 +745,9 @@ then
       fi
       ((p+=1))
     done
-    # Alle Partitionen des Ziel-Medums
+    # ----------------------------------
+    # Alle Partitionen des Ziel-Mediums
+    # ----------------------------------
     p=1;
     while [ $p -lt 100 ] &&
           [ $UMOUNTS_RESULT -eq 0 ];
@@ -547,23 +768,26 @@ then
       echo -e " Das Skript kann daher leider nicht fortgeführt werden."
       exit 1
     fi
-    # --------------------------------------------------------
-    # Je nach Auswahl Partitionen oder ganzes Medium kopieren
-    # --------------------------------------------------------
+    # --------------------------------------------------------------------------
+    # A) Standard
+    # ------------
+    # Alle Partitionen mit "ocs-onthefly" kopieren
+    # --------------------------------------------------------------------------
     echo -e " Starte Kopier-Vorgang von ${bold_yellow}$source_device${colors_off} nach ${bold_yellow}$dest_device${colors_off} ..."
     echo -e "$FULL_LINE"
     if [ $deep_mode -ne 1 ];
     then
-      # echo -e "/usr/sbin/ocs-onthefly -batch -e1 auto -e2 -icds -j2 -nogui -pa command -sfsck -f ${source_device} -t ${dest_device}" # NUR ZUM TESTEN
       /usr/sbin/ocs-onthefly -batch -e1 auto -e2 -icds -iui -ius -j2 -rvd -nogui -pa true --source ${source_device} --target ${dest_device}
       COPY_RESULT=$?
       echo -e "$FULL_LINE"
       if [ $COPY_RESULT -eq 0 ];
       then
-        # Bootloader kopieren (wird zuvor durch ocs-onthefly auf dem Ziel gelöscht bzw.
-        # überschrieben, obwohl die Option -j2 das eigentlich von selbst tun sollte ...)
+        # ---------------------------------------------------------------------
+        # Bootloader kopieren
+        # (wird unter Umständen zuvor durch ocs-onthefly auf dem Ziel gelöscht
+        # bzw. überschrieben, obwohl Option -j2 das von selbst tun sollte ...)
+        # ---------------------------------------------------------------------
         echo -e -n " Kopiere Bootloader ... "
-        # echo -e "dd conv=noerror,sync if=/dev/${source_device} of=/dev/${dest_device} bs=512 count=4 &>/dev/null" # NUR ZUM TESTEN
         dd conv=noerror,sync if=/dev/${source_device} of=/dev/${dest_device} bs=512 count=4 &>/dev/null
         COPY_RESULT=$?
         if [ $COPY_RESULT -eq 0 ];
@@ -573,18 +797,47 @@ then
           echo -e "$ERROR_TAG"
         fi
       fi
+    # --------------------------------------------------------------------------
+    # B) Deep-Mode
+    # -------------
+    # Ganzes Medium mit "dd" klonen und dabei Lese-Fehler ignorieren
+    # --------------------------------------------------------------------------
     else
-      # echo -e "dd conv=noerror,sync if=/dev/${source_device} of=/dev/${dest_device} status=progress" # NUR ZUM TESTEN
       dd conv=noerror,sync if=/dev/${source_device} of=/dev/${dest_device} status=progress
       COPY_RESULT=$?
     fi
+    # --------------------------------------------------------------------------
+    # Ende des Kopiervorgangs
+    # --------------------------------------------------------------------------
     echo -e "$FULL_LINE"
     if [ $COPY_RESULT -eq 0 ];
     then
       echo -e " Fertig, alles erledigt ... $OK_TAG"
-      echo -e " Vielen Dank für die Nutzung und auf Wiedersehen :)"
     else
       echo -e " $ERROR_TAG, der Kopier-Vorgang war nicht erfolgreich!"
     fi
   fi
+  else
+    echo -e " $CANCEL_TEXT"
+else
+  echo -e " $CANCEL_TEXT"
 fi
+
+#===============================================================================
+# Ende des Skripts
+#===============================================================================
+# ------------------------------------------------------------------------------
+# Download-Ordner ganz löschen wenn keine Dateien mehr darin sind
+# ------------------------------------------------------------------------------
+if [ "$DOWNLOAD_DIR" != "" ] &&
+   [ "$DOWNLOAD_DIR" != "/" ] &&
+   [ "$DOWNLOAD_DIR" != "/tmp" ] &&
+   [ -d "$DOWNLOAD_DIR" ] &&
+   [ $(ls -A "$DOWNLOAD_DIR" | wc -w) -eq 0 ];
+then
+  rmdir "$DOWNLOAD_DIR" &>/dev/null
+fi
+# ------------------------------------------------------------------------------
+# Auf Wiedersehen
+# ------------------------------------------------------------------------------
+echo -e " Vielen Dank für die Nutzung und auf Wiedersehen :)"

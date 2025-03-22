@@ -547,7 +547,7 @@ then
   x=0
   while [ $x -lt $devices_in_list ];
   do
-    echo -e -n " [${bold_white}${device_list[$x]}${colors_off}] sd${device_list[$x]}"
+    echo -e -n " [${bold_yellow}${device_list[$x]}${colors_off}] ${bold_white}sd${device_list[$x]}${colors_off}"
     show_disk_info "sd${device_list[$x]}"
     echo -e ""
     ((x+=1))
@@ -559,7 +559,7 @@ then
   # Quelle auswählen
   # ----------------------------------------------------------------------------
   echo -e ""
-  echo -e -n " Bitte ${bold_white}Quelle${colors_off} auswählen: "
+  echo -e -n " Bitte ${bold_yellow}Quelle${colors_off} auswählen: "
   source_device=""
   source_select=0
   while [ $source_select -eq 0 ] &&
@@ -593,7 +593,7 @@ then
     echo -e -n "${bold_yellow}$source_device${colors_off}"
     show_disk_info "$source_device"
     echo -e ""
-    echo -e -n " Bitte ${bold_white}Ziel${colors_off} auswählen:   "
+    echo -e -n " Bitte ${bold_yellow}Ziel${colors_off} auswählen:   "
     dest_device=""
     dest_select=0
     while [ $dest_select -eq 0 ] &&
@@ -840,4 +840,5 @@ fi
 # ------------------------------------------------------------------------------
 # Auf Wiedersehen
 # ------------------------------------------------------------------------------
-echo -e " Vielen Dank für die Nutzung und auf Wiedersehen :)"
+echo -e ""
+echo -e " ${bold_green}Vielen Dank${colors_off} für die Nutzung und auf Wiedersehen :)"

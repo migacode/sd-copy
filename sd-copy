@@ -816,9 +816,9 @@ then
     else
       echo -e " $ERROR_TAG, der Kopier-Vorgang war nicht erfolgreich!"
     fi
-  fi
   else
     echo -e " $CANCEL_TEXT"
+  fi
 else
   echo -e " $CANCEL_TEXT"
 fi

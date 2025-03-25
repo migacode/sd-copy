@@ -39,8 +39,8 @@
 #   über https://migano.de oder per E-Mail an kontakt@migano.de. Danke.        #
 #                                                                              #
 ################################################################################
-# Letzte Änderung: 22.03.2025
-VERSION="1.40"
+# Letzte Änderung: 25.03.2025
+VERSION="1.50"
 
 ################################################################################
 #
@@ -182,53 +182,55 @@ function insert_spaces {
 # Parameter $1: Device-Name (ohne Pfad, bspw. sda)
 #===============================================================================
 function show_disk_info {
-  if smartctl --version &>/dev/null;
+  DEVICE_NAME="/dev/$1"
+  # ---------------------------------------
+  # Maximale Länge jeder Teil-Zeichenfolge
+  # ---------------------------------------
+  MAX_INFO_LENGTH=24
+  # --------------------
+  # Hersteller (Family)
+  # --------------------
+  DISK_FAMILY=$(smartctl -x ${DEVICE_NAME} 2>/dev/null | grep -i -E "Model\s*Family" | sed -E "s/Model\s*Family\s*:*//i" | xargs)
+  if [ ${#DISK_FAMILY} -gt $MAX_INFO_LENGTH ]; then DISK_FAMILY=${DISK_FAMILY:0:$MAX_INFO_LENGTH}; fi
+  # --------------------
+  # Bezeichnung (Model)
+  # --------------------
+  DISK_MODEL=$(LANG=en smartctl -i -d sat ${DEVICE_NAME} 2>/dev/null | grep -i -E "device\s*model" | cut -d":" -f 2 | xargs)
+  if [ "$DISK_MODEL" == "" ];
   then
-    DEVICE_NAME="/dev/$1"
-    # ---------------------------------------
-    # Maximale Länge jeder Teil-Zeichenfolge
-    # ---------------------------------------
-    MAX_INFO_LENGTH=24
-    # --------------------
-    # Hersteller (Family)
-    # --------------------
-    DISK_FAMILY=$(smartctl -x ${DEVICE_NAME} 2>/dev/null | grep -i -E "Model\s*Family" | sed -E "s/Model\s*Family\s*:*//i" | xargs)
-    if [ ${#DISK_FAMILY} -gt $MAX_INFO_LENGTH ]; then DISK_FAMILY=${DISK_FAMILY:0:$MAX_INFO_LENGTH}; fi
-    # --------------------
-    # Bezeichnung (Model)
-    # --------------------
-    DISK_MODEL=$(LANG=en smartctl -i -d sat ${DEVICE_NAME} 2>/dev/null | grep -i -E "device\s*model" | cut -d":" -f 2 | xargs)
-    if [ "$DISK_MODEL" == "" ];
+    DISK_MODEL=$(LANG=en lsblk -S -o model ${DEVICE_NAME} 2>/dev/null | awk 'NR>1' | xargs)
+  fi
+  if [ "$DISK_MODEL" == "" ];
+  then
+    DISK_MODEL=$(LANG=en parted -s ${DEVICE_NAME} print 2>/dev/null | grep -i -E "^model" | cut -d":" -f 2 | xargs)
+  fi
+  DISK_MODEL=$(echo ${DISK_MODEL//_/ } | xargs)
+  if [ ${#DISK_MODEL} -gt $MAX_INFO_LENGTH ]; then DISK_MODEL=${DISK_MODEL:0:$MAX_INFO_LENGTH}; fi
+  # ----------------------
+  # Seriennummer (Serial)
+  # ----------------------
+  DISK_SERIAL=$(LANG=en smartctl -i -d sat ${DEVICE_NAME} 2>/dev/null | grep -i -E "serial\s*number" | cut -d":" -f 2 | xargs)
+  if [ "$DISK_SERIAL" == "" ];
+  then
+    if udevadm --version &>/dev/null;
     then
-      DISK_MODEL=$(LANG=en lsblk -S -o model ${DEVICE_NAME} 2>/dev/null | awk 'NR>1' | xargs)
+      DISK_SERIAL=$(LANG=en udevadm info --name=${DEVICE_NAME} 2>/dev/null | grep -i -E "\s*E:\s*ID_SERIAL_SHORT\s*=" | head -n 1 | sed -E "s/\s*E:\s*ID_SERIAL_SHORT\s*=//i" | xargs)
     fi
-    if [ "$DISK_MODEL" == "" ];
-    then
-      DISK_MODEL=$(LANG=en parted -s ${DEVICE_NAME} print 2>/dev/null | grep -i -E "^model" | cut -d":" -f 2 | xargs)
-    fi
-    DISK_MODEL=$(echo ${DISK_MODEL//_/ } | xargs)
-    if [ ${#DISK_MODEL} -gt $MAX_INFO_LENGTH ]; then DISK_MODEL=${DISK_MODEL:0:$MAX_INFO_LENGTH}; fi
-    # ----------------------
-    # Seriennummer (Serial)
-    # ----------------------
-    DISK_SERIAL=$(LANG=en smartctl -i -d sat ${DEVICE_NAME} 2>/dev/null | grep -i -E "serial\s*number" | cut -d":" -f 2 | xargs)
-    if [ "$DISK_SERIAL" == "" ];
-    then
-      if udevadm --version &>/dev/null;
-      then
-        DISK_SERIAL=$(LANG=en udevadm info --name=${DEVICE_NAME} | grep -i -E "\s*E:\s*ID_SERIAL_SHORT\s*=" | head -n 1 | sed -E "s/\s*E:\s*ID_SERIAL_SHORT\s*=//i" | xargs)
-      fi
-    fi
-    if [ ${#DISK_SERIAL} -gt $MAX_INFO_LENGTH ]; then DISK_SERIAL=${DISK_SERIAL:(-$MAX_INFO_LENGTH):$MAX_INFO_LENGTH}; fi
-    # ------------------
-    # Start der Ausgabe
-    # ------------------
+  fi
+  if [ ${#DISK_SERIAL} -gt $MAX_INFO_LENGTH ]; then DISK_SERIAL=${DISK_SERIAL:(-$MAX_INFO_LENGTH):$MAX_INFO_LENGTH}; fi
+  # ------------------
+  # Start der Ausgabe
+  # ------------------
+  if [ "$DISK_FAMILY" != "" ] ||
+     [ "$DISK_MODEL"  != "" ] ||
+     [ "$DISK_SERIAL" != "" ];
+  then
     echo -e -n " -"
     if [ "$DISK_MODEL"  != "" ]; then echo -e -n  " ${light_blue}$DISK_MODEL${colors_off}"; fi
     if [ "$DISK_SERIAL" != "" ]; then echo -e -n  " ${light_blue}[$DISK_SERIAL]${colors_off}"; fi
     # if [ "$DISK_FAMILY" != "" ]; then echo -e -n  " ${light_blue}$DISK_FAMILY${colors_off}"; fi
   else
-    echo -e -n " (keine Angaben)"
+    echo -e -n " ${dark_grey}[keine weiteren Angaben]${colors_off}"
   fi
 }
 

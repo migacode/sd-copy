@@ -39,13 +39,13 @@
 #   über https://migano.de oder per E-Mail an kontakt@migano.de. Danke.        #
 #                                                                              #
 ################################################################################
-# Letzte Änderung: 25.03.2025
-VERSION="1.50"
+# Letzte Änderung: 02.04.2025
+VERSION="1.52"
 
 ################################################################################
-#
-#                            Funktionen definieren
-#
+#                                                                              #
+#                            Funktionen definieren                             #
+#                                                                              #
 ################################################################################
 #===============================================================================
 # Einfache Ja/Nein-Abfrage
@@ -180,36 +180,65 @@ function insert_spaces {
 # Ermittlung und Anzeige der Hardware-Informationen zu einer Disk
 # ----------------------------------------------------------------
 # Parameter $1: Device-Name (ohne Pfad, bspw. sda)
+# Parameter $2: Kapazität anzeigen (1) oder nicht (0)
+# Parameter $3: Maximale Länge jeder Teil-Zeichenfolge
 #===============================================================================
 function show_disk_info {
   DEVICE_NAME="/dev/$1"
-  # ---------------------------------------
-  # Maximale Länge jeder Teil-Zeichenfolge
-  # ---------------------------------------
-  MAX_INFO_LENGTH=24
-  # --------------------
-  # Hersteller (Family)
-  # --------------------
-  DISK_FAMILY=$(smartctl -x ${DEVICE_NAME} 2>/dev/null | grep -i -E "Model\s*Family" | sed -E "s/Model\s*Family\s*:*//i" | xargs)
+  SHOW_CAPACITY="$2"
+  if [ "$SHOW_CAPACITY" == "" ]; then SHOW_CAPACITY=0; fi
+  MAX_INFO_LENGTH="$3"
+  if [ "$MAX_INFO_LENGTH" == "" ]; then MAX_INFO_LENGTH=24; fi
+  # --------------------------------
+  # Hersteller (Family / Vendor)
+  # --------------------------------
+  # smartctl
+  DISK_FAMILY=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "Model\s*Family" | sed -E "s/Model\s*Family\s*:*//i" | xargs)
+  # lsblk
+  if [ "$DISK_FAMILY" == "" ];
+  then
+    DISK_FAMILY=$(LANG=en lsblk -d -n -o vendor ${DEVICE_NAME} 2>/dev/null | head -n 1 | xargs)
+  fi
+  # Ausgabe bereinigen
+  DISK_FAMILY=$(echo ${DISK_FAMILY//_/ } | sed -E "s/^ATA//" | sed -E "s/^USB//" | xargs)
   if [ ${#DISK_FAMILY} -gt $MAX_INFO_LENGTH ]; then DISK_FAMILY=${DISK_FAMILY:0:$MAX_INFO_LENGTH}; fi
-  # --------------------
+  # --------------------------------
   # Bezeichnung (Model)
-  # --------------------
-  DISK_MODEL=$(LANG=en smartctl -i -d sat ${DEVICE_NAME} 2>/dev/null | grep -i -E "device\s*model" | cut -d":" -f 2 | xargs)
+  # --------------------------------
+  # smartctl
+  DISK_MODEL=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "device\s*model" | cut -d":" -f 2 | xargs)
+  # lsblk
   if [ "$DISK_MODEL" == "" ];
   then
-    DISK_MODEL=$(LANG=en lsblk -S -o model ${DEVICE_NAME} 2>/dev/null | awk 'NR>1' | xargs)
+    DISK_MODEL=$(LANG=en lsblk -d -n -o model ${DEVICE_NAME} 2>/dev/null | head -n 1 | xargs)
   fi
+  # parted
   if [ "$DISK_MODEL" == "" ];
   then
     DISK_MODEL=$(LANG=en parted -s ${DEVICE_NAME} print 2>/dev/null | grep -i -E "^model" | cut -d":" -f 2 | xargs)
   fi
+  # udevadm
+  if [ "$DISK_MODEL" == "" ];
+  then
+    if udevadm --version &>/dev/null;
+    then
+      DISK_MODEL=$(LANG=en udevadm info --name=${DEVICE_NAME} 2>/dev/null | grep -i -E ".*id_model=" | cut -d"=" -f 2 | xargs)
+    fi
+  fi
+  # Ausgabe bereinigen
   DISK_MODEL=$(echo ${DISK_MODEL//_/ } | xargs)
   if [ ${#DISK_MODEL} -gt $MAX_INFO_LENGTH ]; then DISK_MODEL=${DISK_MODEL:0:$MAX_INFO_LENGTH}; fi
-  # ----------------------
+  # --------------------------------
   # Seriennummer (Serial)
-  # ----------------------
-  DISK_SERIAL=$(LANG=en smartctl -i -d sat ${DEVICE_NAME} 2>/dev/null | grep -i -E "serial\s*number" | cut -d":" -f 2 | xargs)
+  # --------------------------------
+  # smartctl
+  DISK_SERIAL=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "serial\s*number" | cut -d":" -f 2 | xargs)
+  # lsblk
+  if [ "$DISK_SERIAL" == "" ];
+  then
+    DISK_SERIAL=$(LANG=en lsblk -d -n -o serial ${DEVICE_NAME} 2>/dev/null | head -n 1 | xargs)
+  fi
+  # udevadm
   if [ "$DISK_SERIAL" == "" ];
   then
     if udevadm --version &>/dev/null;
@@ -217,7 +246,43 @@ function show_disk_info {
       DISK_SERIAL=$(LANG=en udevadm info --name=${DEVICE_NAME} 2>/dev/null | grep -i -E "\s*E:\s*ID_SERIAL_SHORT\s*=" | head -n 1 | sed -E "s/\s*E:\s*ID_SERIAL_SHORT\s*=//i" | xargs)
     fi
   fi
-  if [ ${#DISK_SERIAL} -gt $MAX_INFO_LENGTH ]; then DISK_SERIAL=${DISK_SERIAL:(-$MAX_INFO_LENGTH):$MAX_INFO_LENGTH}; fi
+  # Ausgabe bereinigen
+  DISK_SERIAL=$(echo ${DISK_SERIAL//_/ } | xargs)
+  if [ ${#DISK_SERIAL} -gt $MAX_INFO_LENGTH ]; then DISK_SERIAL="~${DISK_SERIAL:(-$MAX_INFO_LENGTH):$MAX_INFO_LENGTH}"; fi
+  # --------------------------------
+  # Kapazität
+  # --------------------------------
+  NUMBER_HAS_FORMAT=0
+  # smartctl
+  DISK_CAPACITY=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "user\s*capacity" | cut -d ":" -f 2 | awk '{print $1}' | sed "s/[^0-9]//g" | xargs)
+  # lsblk
+  if [ "$DISK_CAPACITY" == "" ];
+  then
+    DISK_CAPACITY=$(LANG=en lsblk -d -n -o size ${DEVICE_NAME} 2>/dev/null | head -n 1 | xargs)
+    # Wenn die Ausgabe schon formatiert ist, diese nicht mehr neu formatieren
+    if [ $(echo ${DISK_CAPACITY} | grep -c -i -E "[KMGT]") -gt 0 ]; then NUMBER_HAS_FORMAT=1; fi
+  fi
+  # parted
+  if [ "$DISK_CAPACITY" == "" ];
+  then
+    DISK_CAPACITY=$(LANG=en parted -s ${DEVICE_NAME} print 2>/dev/null | grep -i -E "^Disk ${DEVICE_NAME}" | cut -d":" -f 2 | xargs)
+    # Wenn die Ausgabe schon formatiert ist, diese nicht mehr neu formatieren
+    if [ $(echo ${DISK_CAPACITY} | grep -c -i -E "[KMGT]") -gt 0 ]; then NUMBER_HAS_FORMAT=1; fi
+  fi
+  if [ $NUMBER_HAS_FORMAT -eq 0 ] &&
+     [ "$DISK_CAPACITY" != "" ];
+  then
+    DISK_SIZE=$(show_human_bytes ${DISK_CAPACITY} "M")
+    if [ ${#DISK_SIZE} -gt 7 ];
+    then
+      DISK_SIZE=$(show_human_bytes ${DISK_CAPACITY} "G")
+    fi
+  else
+    DISK_SIZE="$DISK_CAPACITY"
+  fi
+  DISK_CAPACITY="$DISK_SIZE"
+  # Ausgabe bereinigen
+  if [ ${#DISK_CAPACITY} -gt $MAX_INFO_LENGTH ]; then DISK_CAPACITY=${DISK_CAPACITY:0:$MAX_INFO_LENGTH}; fi
   # ------------------
   # Start der Ausgabe
   # ------------------
@@ -226,6 +291,11 @@ function show_disk_info {
      [ "$DISK_SERIAL" != "" ];
   then
     echo -e -n " -"
+    if [ "$DISK_CAPACITY" != "" ] &&
+       [ $SHOW_CAPACITY -ne 0 ];
+    then
+      echo -e -n  " ${light_blue}$DISK_CAPACITY${colors_off}"
+    fi
     if [ "$DISK_MODEL"  != "" ]; then echo -e -n  " ${light_blue}$DISK_MODEL${colors_off}"; fi
     if [ "$DISK_SERIAL" != "" ]; then echo -e -n  " ${light_blue}[$DISK_SERIAL]${colors_off}"; fi
     # if [ "$DISK_FAMILY" != "" ]; then echo -e -n  " ${light_blue}$DISK_FAMILY${colors_off}"; fi
@@ -234,10 +304,78 @@ function show_disk_info {
   fi
 }
 
+#===============================================================================
+# Darstellung von Zahlen in einem für Menschen lesbaren Format
+# Da Bash nur Integer-Werte verarbeiten kann und grundsätzlich abrundet,
+# müssen wir uns mit einem Trick auch noch um die richtige Rundung kümmern ;)
+# ----------------------------------------------------------------------------
+# Parameter $1: Umzuwandelnde Zahl
+# Parameter $2: Zielgröße -> B (Bytes) | K (KB) | M (MB) | G (GB)
+# Parameter $3: Faktor für die Größe eines Kilobytes (ohne Angabe = 1024)
+#===============================================================================
+function show_human_bytes {
+  THE_NUMBER=$1
+  SIZE_FACTOR="$(echo -n $2 | tr '[:lower:]' '[:upper:]')"
+  if [ "$3" != "" ];
+  then
+    BYTES_FACTOR=$3
+  else
+    BYTES_FACTOR=$((1024))
+  fi
+  ONE_KB=$((BYTES_FACTOR))
+  HALF_KB=$((ONE_KB / 2))
+  ONE_MB=$((ONE_KB * BYTES_FACTOR))
+  HALF_MB=$((ONE_MB / 2))
+  ONE_GB=$((ONE_MB * BYTES_FACTOR))
+  HALF_GB=$((ONE_GB / 2))
+  ONE_TB=$((ONE_GB * BYTES_FACTOR))
+  HALF_TB=$((ONE_TB / 2))
+  if [ $THE_NUMBER -ge $ONE_TB ] &&
+     [ "$SIZE_FACTOR" != "G" ] &&
+     [ "$SIZE_FACTOR" != "M" ] &&
+     [ "$SIZE_FACTOR" != "K" ] &&
+     [ "$SIZE_FACTOR" != "B" ];
+  then
+    ((THE_NUMBER+=HALF_TB))
+    ((THE_NUMBER=THE_NUMBER/BYTES_FACTOR/BYTES_FACTOR/BYTES_FACTOR/BYTES_FACTOR))
+    THE_NUMBER="${THE_NUMBER} TB"
+  else
+    if [ $THE_NUMBER -ge $ONE_GB ] &&
+       [ "$SIZE_FACTOR" != "M" ] &&
+       [ "$SIZE_FACTOR" != "K" ] &&
+       [ "$SIZE_FACTOR" != "B" ];
+    then
+      ((THE_NUMBER+=HALF_GB))
+      ((THE_NUMBER=THE_NUMBER/BYTES_FACTOR/BYTES_FACTOR/BYTES_FACTOR))
+      THE_NUMBER="${THE_NUMBER} GB"
+    else
+      if [ $THE_NUMBER -ge $ONE_MB ] &&
+         [ "$SIZE_FACTOR" != "K" ] &&
+         [ "$SIZE_FACTOR" != "B" ];
+      then
+        ((THE_NUMBER+=HALF_MB))
+        ((THE_NUMBER=THE_NUMBER/BYTES_FACTOR/BYTES_FACTOR))
+        THE_NUMBER="${THE_NUMBER} MB"
+      else
+        if [ $THE_NUMBER -ge $ONE_KB ] &&
+           [ "$SIZE_FACTOR" != "B" ];
+        then
+          ((THE_NUMBER+=HALF_KB))
+          ((THE_NUMBER=THE_NUMBER/BYTES_FACTOR))
+          THE_NUMBER="${THE_NUMBER} KB"
+        else
+          THE_NUMBER="${THE_NUMBER} B"
+        fi
+      fi
+    fi
+  fi
+  echo "$THE_NUMBER"
+}
+
 ################################################################################
-#
-#                             Variablen definieren
-#
+#                                                                              #
+#                             Variablen definieren                             #
+#                                                                              #
 ################################################################################
 #===============================================================================
 # Pfad-Angaben zu uns selbst (aufgerufenes Skript)
@@ -328,9 +466,9 @@ HINWEIS_TAG="${bold_blue}Hinweis${colors_off}"
 OK_TAG="${bold_green}ok${colors_off}"
 
 ################################################################################
-#
-#                                Here we go ...
-#
+#                                                                              #
+#                                Here we go ...                                #
+#                                                                              #
 ################################################################################
 #===============================================================================
 # Eigenen Benutzernamen und Benutzer-ID ermitteln
@@ -475,7 +613,7 @@ fi
 boot_device="$(findmnt -n / 2>/dev/null | awk '{ print $2 }' | sed -E "s/\/dev\///" | sed -E "s/[0-9]//")"
 echo -e ""
 echo -e -n " System gebootet von ... ${bold_purple}$boot_device${colors_off}${light_blue}"
-show_disk_info "$boot_device"
+show_disk_info "$boot_device" "0" "21"
 echo -e "${colors_off}"
 if [ $required_errors -gt 0 ];
 then
@@ -550,7 +688,7 @@ then
   while [ $x -lt $devices_in_list ];
   do
     echo -e -n " [${bold_yellow}${device_list[$x]}${colors_off}] ${bold_white}sd${device_list[$x]}${colors_off}"
-    show_disk_info "sd${device_list[$x]}"
+    show_disk_info "sd${device_list[$x]}" "1" "20"
     echo -e ""
     ((x+=1))
   done
@@ -587,13 +725,14 @@ then
       do_auto_select=1
     fi
   done
+
   # ----------------------------------------------------------------------------
   # Wenn eine Quelle ausgewählt wurde, dann auch ein Ziel auswählen
   # ----------------------------------------------------------------------------
   if [ $do_auto_select -eq 0 ];
   then
     echo -e -n "${bold_yellow}$source_device${colors_off}"
-    show_disk_info "$source_device"
+    show_disk_info "$source_device" "1" "14"
     echo -e ""
     echo -e -n " Bitte ${bold_yellow}Ziel${colors_off} auswählen:   "
     dest_device=""
@@ -625,7 +764,7 @@ then
     if [ $do_auto_select -eq 0 ];
     then
       echo -e -n "${bold_yellow}$dest_device${colors_off}"
-      show_disk_info "$dest_device"
+      show_disk_info "$dest_device" "1" "14"
       echo -e ""
     fi
   fi
@@ -663,7 +802,7 @@ then
   done
   source_device="sd${new_disc_letter}"
   echo -e -n "${bold_yellow}$source_device${colors_off}"
-  show_disk_info "$source_device"
+  show_disk_info "$source_device" "1" "12"
   echo -e ""
   echo -e -n " Bitte ${bold_yellow}Ziel${colors_off} anschließen ...   "
   new_disc_letter=""
@@ -675,7 +814,7 @@ then
   done
   dest_device="sd${new_disc_letter}"
   echo -e -n "${bold_yellow}$dest_device${colors_off}"
-  show_disk_info "$dest_device"
+  show_disk_info "$dest_device" "1" "12"
   echo -e ""
 fi
 

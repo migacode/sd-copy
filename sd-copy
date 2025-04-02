@@ -40,7 +40,7 @@
 #                                                                              #
 ################################################################################
 # Letzte Änderung: 02.04.2025
-VERSION="1.52"
+VERSION="1.53"
 
 ################################################################################
 #                                                                              #
@@ -114,7 +114,7 @@ function download_icon_file {
       chown -R "root:root" "$PKG_PICTURE_FILE" &>/dev/null
       chmod -R 0644 "$PKG_PICTURE_FILE" &>/dev/null
     else
-      rm -f "$LOCAL_DOWNLOAD_FILE" &>/dev/null
+      remove_file "$LOCAL_DOWNLOAD_FILE"
     fi
   fi
 }
@@ -163,6 +163,21 @@ function get_disk_letter {
 }
 
 #===============================================================================
+# Versionsnummer der Form X.Y.Z in nummerischen Wert umwandeln
+#===============================================================================
+function get_version_value {
+  THE_VERSION=$(echo -n ${1} | sed "s/[^0-9\.]//g" | xargs)
+  VERSION_PART_1=$(echo ${THE_VERSION} | cut -d '.' -f 1 | xargs)
+  if [ "$VERSION_PART_1" == "" ]; then VERSION_PART_1="00"; fi
+  VERSION_PART_2=$(echo ${THE_VERSION} | cut -d '.' -f 2 | xargs)
+  if [ "$VERSION_PART_2" == "" ]; then VERSION_PART_2="00"; fi
+  VERSION_PART_3=$(echo ${THE_VERSION} | cut -d '.' -f 3 | xargs)
+  if [ "$VERSION_PART_3" == "" ]; then VERSION_PART_3="00"; fi
+  VERSION_VALUE=$(((${VERSION_PART_1:0:2}*10000)+(${VERSION_PART_2:0:2}*100)+(${VERSION_PART_3:0:2})))
+  echo -n "$VERSION_VALUE"
+}
+
+#===============================================================================
 # Einfügung von Leerzeichen
 # --------------------------
 # Parameter $1: Anzahl
@@ -174,6 +189,17 @@ function insert_spaces {
     echo -e -n " "
     ((i+=1))
   done
+}
+
+#===============================================================================
+# Löschen einer bestimmten einzelnen Datei
+#===============================================================================
+function remove_file {
+  if [ "$1" != "" ] &&
+     [ -f "$1" ];
+  then
+    rm -f "$1" &>/dev/null
+  fi
 }
 
 #===============================================================================
@@ -378,6 +404,12 @@ function show_human_bytes {
 #                                                                              #
 ################################################################################
 #===============================================================================
+# URLs zum Download dieses Scriptes
+#===============================================================================
+THIS_SCRIPT_URL="https://migano.de/download/sd-copy/sd-copy"
+THIS_SCRIPT_ICO="https://migano.de/download/sd-copy/png/sd-copy.png"
+
+#===============================================================================
 # Pfad-Angaben zu uns selbst (aufgerufenes Skript)
 #===============================================================================
 SCRIPT_PATH="$(pwd)"
@@ -521,9 +553,47 @@ printf %b '\e]10;#eeeeee\a' # Schriftfarbe (VT100) immer hell ;)
 printf %b '\e]11;#242628\a' # Hintergrundfarbe (VT100) immer dunkel ;)
 clear
 echo -e "$HEADLINE_TEXT"
-echo -e ""
-echo -e " Erstellt \"on-the-fly\" eine vollständige Kopie eines Speichermediums auf ein"
-echo -e " anderes Medium. Dazu müssen beide Speichermedien physisch angeschlossen sein."
+
+#===============================================================================
+# Kommandozeilen-Parameter einlesen und entsprechende Optionen setzen
+#===============================================================================
+DEFAULT_DEEPMODE="n"
+CHECK_UPDATE=1
+for arg in $@;
+do
+  arg=$(printf %b "${arg}" | tr A-Z a-z)
+  # ----------------------------------------------------------------------------
+  # deep
+  # ----------------------------------------------------------------------------
+  if [ "$arg" == "--deep" ] || [ "$arg" == "-d" ];
+  then
+    DEFAULT_DEEPMODE="j"
+  fi
+  # ----------------------------------------------------------------------------
+  # help
+  # ----------------------------------------------------------------------------
+  if [ "$arg" == "--help" ] || [ "$arg" == "-h" ];
+  then
+    echo -e ""
+    echo -e " Erstellt \"on-the-fly\" eine vollständige Kopie eines Speichermediums auf ein"
+    echo -e " anderes Medium. Dazu müssen beide Speichermedien physisch angeschlossen sein."
+    echo -e ""
+    echo -e " Syntax: sudo ${0} [Optionen]"
+    echo -e ""
+    echo -e " Optionen:"
+    echo -e "  -d, --deep      Verwendet den Deep-Modus (dd) als Standard."
+    echo -e "  -h, --help      Zeigt diese Seite an."
+    echo -e "  -n, --noupdate  Sucht nicht nach Updates für dieses Skript."
+    exit 0
+  fi
+  # ----------------------------------------------------------------------------
+  # noupdate
+  # ----------------------------------------------------------------------------
+  if [ "$arg" == "--noupdate" ] || [ "$arg" == "-n" ];
+  then
+    CHECK_UPDATE=0
+  fi
+done
 
 #===============================================================================
 # Aufruf als Superuser prüfen
@@ -536,14 +606,55 @@ then
 fi
 
 #===============================================================================
-# Kommandozeilen-Optionen einlesen
+# Auf neuere Version prüfen
 #===============================================================================
-DEFAULT_DEEPMODE="n"
-for arg in $@;
-do
-  arg=$(printf %b "${arg}" | tr A-Z a-z)
-  if [ "$arg" == "--deep" ] || [ "$arg" == "-d" ]; then DEFAULT_DEEPMODE="j"; fi
-done
+if [ $CHECK_UPDATE -eq 1 ];
+then
+  LOCAL_DOWNLOAD_FILE="./$SCRIPT_NAME.new"
+  wget -nv -O "$LOCAL_DOWNLOAD_FILE" "$THIS_SCRIPT_URL" &>/dev/null
+  if [ $? -eq 0 ] &&
+     [ -s "$LOCAL_DOWNLOAD_FILE" ] &&
+     [ $(grep -i -c -E "Error\s*404" "$LOCAL_DOWNLOAD_FILE") -eq 0 ];
+  then
+    chown -R "$USER_USERNAME:$USER_USERNAME" "$LOCAL_DOWNLOAD_FILE" &>/dev/null
+    chmod -R 0755 "$LOCAL_DOWNLOAD_FILE" &>/dev/null
+    NEW_VERSION=$(grep -i -E "^\s*version=" "$LOCAL_DOWNLOAD_FILE" | sed -E "s/^\s*version=//i" | sed -E "s/\"//g" | xargs)
+    OLD_VERSION_VALUE=$(get_version_value ${VERSION})
+    NEW_VERSION_VALUE=$(get_version_value ${NEW_VERSION})
+    if [ $OLD_VERSION_VALUE -lt $NEW_VERSION_VALUE ];
+    then
+      echo -e ""
+      echo -e " Version ${light_yellow}$NEW_VERSION${colors_off} ist verfügbar. Es wird empfohlen, die neue Version zu verwenden."
+      ask_yes_or_no "Alte Version sichern und neue Version verwenden" "j"
+      if [ $? -eq 1 ];
+      then
+        mv -f "${0}" "${0}.bak" &>/dev/null
+        if [ $? -eq 0 ];
+        then
+          echo -e " Alte Version gesichert als ${bold_purple}${0}.bak${colors_off}"
+          mv -f "$LOCAL_DOWNLOAD_FILE" "${0}"
+          if [ $? -eq 0 ];
+          then
+            echo -e " ${bold_white}$SCRIPT_NAME${colors_off} wurde aktualisiert und beendet - bitte jetzt neu aufrufen ... $OK_TAG"
+          else
+            echo -e " $ERROR_TAG: Die Aktualisierung konnte leider ${bold_red}nicht${colors_off} korrekt durchgeführt werden."
+            echo -e " Zum Überspringen der Aktualisierung bitte die Option ${light_cyan}--noupdate${colors_off} verwenden."
+          fi
+          exit 1
+        else
+          echo -e "$ERROR_TAG: Sicherung konnte nicht angelegt werden"
+        fi
+      else
+        remove_file "$LOCAL_DOWNLOAD_FILE"
+      fi
+      echo -e "$FULL_LINE"
+    else
+      remove_file "$LOCAL_DOWNLOAD_FILE"
+    fi
+  else
+    remove_file "$LOCAL_DOWNLOAD_FILE"
+  fi
+fi
 
 #===============================================================================
 # Erforderliche Komponenten prüfen und ggf. nachinstallieren

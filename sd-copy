@@ -39,8 +39,8 @@
 #   über https://migano.de oder per E-Mail an kontakt@migano.de. Danke.        #
 #                                                                              #
 ################################################################################
-# Letzte Änderung: 02.04.2025
-VERSION="1.53"
+# Letzte Änderung: 03.04.2025
+VERSION="1.54"
 
 ################################################################################
 #                                                                              #
@@ -721,7 +721,7 @@ then
   echo -e ""
   exit 1
 fi
-boot_device="$(findmnt -n / 2>/dev/null | awk '{ print $2 }' | sed -E "s/\/dev\///" | sed -E "s/[0-9]//")"
+boot_device="$(findmnt -n / 2>/dev/null | awk '{ print $2 }' | sed -E "s/\/dev\///" | sed -E "s/(sd[a-z])[0-9]+/\1/" | sed -E "s/(^mm[a-z]*[0-9]+)(.)*/\1/")"
 echo -e ""
 echo -e -n " System gebootet von ... ${bold_purple}$boot_device${colors_off}${light_blue}"
 show_disk_info "$boot_device" "0" "21"

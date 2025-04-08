@@ -39,8 +39,8 @@
 #   über https://migano.de oder per E-Mail an kontakt@migano.de. Danke.        #
 #                                                                              #
 ################################################################################
-# Letzte Änderung: 03.04.2025
-VERSION="1.54"
+# Letzte Änderung: 08.04.2025
+VERSION="1.55"
 
 ################################################################################
 #                                                                              #
@@ -166,12 +166,12 @@ function get_disk_letter {
 # Versionsnummer der Form X.Y.Z in nummerischen Wert umwandeln
 #===============================================================================
 function get_version_value {
-  THE_VERSION=$(echo -n ${1} | sed "s/[^0-9\.]//g" | xargs)
-  VERSION_PART_1=$(echo ${THE_VERSION} | cut -d '.' -f 1 | xargs)
+  THE_VERSION=$(echo -n ${1} | sed "s/[^0-9\.]//g" | xargs 2>/dev/null)
+  VERSION_PART_1=$(echo ${THE_VERSION} | cut -d '.' -f 1 | xargs 2>/dev/null)
   if [ "$VERSION_PART_1" == "" ]; then VERSION_PART_1="00"; fi
-  VERSION_PART_2=$(echo ${THE_VERSION} | cut -d '.' -f 2 | xargs)
+  VERSION_PART_2=$(echo ${THE_VERSION} | cut -d '.' -f 2 | xargs 2>/dev/null)
   if [ "$VERSION_PART_2" == "" ]; then VERSION_PART_2="00"; fi
-  VERSION_PART_3=$(echo ${THE_VERSION} | cut -d '.' -f 3 | xargs)
+  VERSION_PART_3=$(echo ${THE_VERSION} | cut -d '.' -f 3 | xargs 2>/dev/null)
   if [ "$VERSION_PART_3" == "" ]; then VERSION_PART_3="00"; fi
   VERSION_VALUE=$(((${VERSION_PART_1:0:2}*10000)+(${VERSION_PART_2:0:2}*100)+(${VERSION_PART_3:0:2})))
   echo -n "$VERSION_VALUE"
@@ -219,79 +219,79 @@ function show_disk_info {
   # Hersteller (Family / Vendor)
   # --------------------------------
   # smartctl
-  DISK_FAMILY=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "Model\s*Family" | sed -E "s/Model\s*Family\s*:*//i" | xargs)
+  DISK_FAMILY=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "Model\s*Family" | sed -E "s/Model\s*Family\s*:*//i" | xargs 2>/dev/null)
   # lsblk
   if [ "$DISK_FAMILY" == "" ];
   then
-    DISK_FAMILY=$(LANG=en lsblk -d -n -o vendor ${DEVICE_NAME} 2>/dev/null | head -n 1 | xargs)
+    DISK_FAMILY=$(LANG=en lsblk -d -n -o vendor ${DEVICE_NAME} 2>/dev/null | head -n 1 | xargs 2>/dev/null)
   fi
   # Ausgabe bereinigen
-  DISK_FAMILY=$(echo ${DISK_FAMILY//_/ } | sed -E "s/^ATA//" | sed -E "s/^USB//" | xargs)
+  DISK_FAMILY=$(echo ${DISK_FAMILY//_/ } | sed -E "s/^ATA//" | sed -E "s/^USB//" | xargs 2>/dev/null)
   if [ ${#DISK_FAMILY} -gt $MAX_INFO_LENGTH ]; then DISK_FAMILY=${DISK_FAMILY:0:$MAX_INFO_LENGTH}; fi
   # --------------------------------
   # Bezeichnung (Model)
   # --------------------------------
   # smartctl
-  DISK_MODEL=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "device\s*model" | cut -d":" -f 2 | xargs)
+  DISK_MODEL=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "device\s*model" | cut -d":" -f 2 | xargs 2>/dev/null)
   # lsblk
   if [ "$DISK_MODEL" == "" ];
   then
-    DISK_MODEL=$(LANG=en lsblk -d -n -o model ${DEVICE_NAME} 2>/dev/null | head -n 1 | xargs)
+    DISK_MODEL=$(LANG=en lsblk -d -n -o model ${DEVICE_NAME} 2>/dev/null | head -n 1 | xargs 2>/dev/null)
   fi
   # parted
   if [ "$DISK_MODEL" == "" ];
   then
-    DISK_MODEL=$(LANG=en parted -s ${DEVICE_NAME} print 2>/dev/null | grep -i -E "^model" | cut -d":" -f 2 | xargs)
+    DISK_MODEL=$(LANG=en parted -s ${DEVICE_NAME} print 2>/dev/null | grep -i -E "^model" | cut -d":" -f 2 | xargs 2>/dev/null)
   fi
   # udevadm
   if [ "$DISK_MODEL" == "" ];
   then
     if udevadm --version &>/dev/null;
     then
-      DISK_MODEL=$(LANG=en udevadm info --name=${DEVICE_NAME} 2>/dev/null | grep -i -E ".*id_model=" | cut -d"=" -f 2 | xargs)
+      DISK_MODEL=$(LANG=en udevadm info --name=${DEVICE_NAME} 2>/dev/null | grep -i -E ".*id_model=" | cut -d"=" -f 2 | xargs 2>/dev/null)
     fi
   fi
   # Ausgabe bereinigen
-  DISK_MODEL=$(echo ${DISK_MODEL//_/ } | xargs)
+  DISK_MODEL=$(echo ${DISK_MODEL//_/ } | xargs 2>/dev/null)
   if [ ${#DISK_MODEL} -gt $MAX_INFO_LENGTH ]; then DISK_MODEL=${DISK_MODEL:0:$MAX_INFO_LENGTH}; fi
   # --------------------------------
   # Seriennummer (Serial)
   # --------------------------------
   # smartctl
-  DISK_SERIAL=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "serial\s*number" | cut -d":" -f 2 | xargs)
+  DISK_SERIAL=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "serial\s*number" | cut -d":" -f 2 | xargs 2>/dev/null)
   # lsblk
   if [ "$DISK_SERIAL" == "" ];
   then
-    DISK_SERIAL=$(LANG=en lsblk -d -n -o serial ${DEVICE_NAME} 2>/dev/null | head -n 1 | xargs)
+    DISK_SERIAL=$(LANG=en lsblk -d -n -o serial ${DEVICE_NAME} 2>/dev/null | head -n 1 | xargs 2>/dev/null)
   fi
   # udevadm
   if [ "$DISK_SERIAL" == "" ];
   then
     if udevadm --version &>/dev/null;
     then
-      DISK_SERIAL=$(LANG=en udevadm info --name=${DEVICE_NAME} 2>/dev/null | grep -i -E "\s*E:\s*ID_SERIAL_SHORT\s*=" | head -n 1 | sed -E "s/\s*E:\s*ID_SERIAL_SHORT\s*=//i" | xargs)
+      DISK_SERIAL=$(LANG=en udevadm info --name=${DEVICE_NAME} 2>/dev/null | grep -i -E "\s*E:\s*ID_SERIAL_SHORT\s*=" | head -n 1 | sed -E "s/\s*E:\s*ID_SERIAL_SHORT\s*=//i" | xargs 2>/dev/null)
     fi
   fi
   # Ausgabe bereinigen
-  DISK_SERIAL=$(echo ${DISK_SERIAL//_/ } | xargs)
+  DISK_SERIAL=$(echo ${DISK_SERIAL//_/ } | xargs 2>/dev/null)
   if [ ${#DISK_SERIAL} -gt $MAX_INFO_LENGTH ]; then DISK_SERIAL="~${DISK_SERIAL:(-$MAX_INFO_LENGTH):$MAX_INFO_LENGTH}"; fi
   # --------------------------------
   # Kapazität
   # --------------------------------
   NUMBER_HAS_FORMAT=0
   # smartctl
-  DISK_CAPACITY=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "user\s*capacity" | cut -d ":" -f 2 | awk '{print $1}' | sed "s/[^0-9]//g" | xargs)
+  DISK_CAPACITY=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "user\s*capacity" | cut -d ":" -f 2 | awk '{print $1}' | sed "s/[^0-9]//g" | xargs 2>/dev/null)
   # lsblk
   if [ "$DISK_CAPACITY" == "" ];
   then
-    DISK_CAPACITY=$(LANG=en lsblk -d -n -o size ${DEVICE_NAME} 2>/dev/null | head -n 1 | xargs)
+    DISK_CAPACITY=$(LANG=en lsblk -d -n -o size ${DEVICE_NAME} 2>/dev/null | head -n 1 | xargs 2>/dev/null)
     # Wenn die Ausgabe schon formatiert ist, diese nicht mehr neu formatieren
     if [ $(echo ${DISK_CAPACITY} | grep -c -i -E "[KMGT]") -gt 0 ]; then NUMBER_HAS_FORMAT=1; fi
   fi
   # parted
   if [ "$DISK_CAPACITY" == "" ];
   then
-    DISK_CAPACITY=$(LANG=en parted -s ${DEVICE_NAME} print 2>/dev/null | grep -i -E "^Disk ${DEVICE_NAME}" | cut -d":" -f 2 | xargs)
+    DISK_CAPACITY=$(LANG=en parted -s ${DEVICE_NAME} print 2>/dev/null | grep -i -E "^Disk ${DEVICE_NAME}" | cut -d":" -f 2 | xargs 2>/dev/null)
     # Wenn die Ausgabe schon formatiert ist, diese nicht mehr neu formatieren
     if [ $(echo ${DISK_CAPACITY} | grep -c -i -E "[KMGT]") -gt 0 ]; then NUMBER_HAS_FORMAT=1; fi
   fi
@@ -618,7 +618,7 @@ then
   then
     chown -R "$USER_USERNAME:$USER_USERNAME" "$LOCAL_DOWNLOAD_FILE" &>/dev/null
     chmod -R 0755 "$LOCAL_DOWNLOAD_FILE" &>/dev/null
-    NEW_VERSION=$(grep -i -E "^\s*version=" "$LOCAL_DOWNLOAD_FILE" | sed -E "s/^\s*version=//i" | sed -E "s/\"//g" | xargs)
+    NEW_VERSION=$(grep -i -E "^\s*version=" "$LOCAL_DOWNLOAD_FILE" | sed -E "s/^\s*version=//i" | sed -E "s/\"//g" | xargs 2>/dev/null)
     OLD_VERSION_VALUE=$(get_version_value ${VERSION})
     NEW_VERSION_VALUE=$(get_version_value ${NEW_VERSION})
     if [ $OLD_VERSION_VALUE -lt $NEW_VERSION_VALUE ];

@@ -39,8 +39,8 @@
 #   über https://migano.de oder per E-Mail an kontakt@migano.de. Danke.        #
 #                                                                              #
 ################################################################################
-# Letzte Änderung: 08.04.2025
-VERSION="1.55"
+# Letzte Änderung: 10.04.2025
+VERSION="1.56"
 
 ################################################################################
 #                                                                              #
@@ -219,7 +219,7 @@ function show_disk_info {
   # Hersteller (Family / Vendor)
   # --------------------------------
   # smartctl
-  DISK_FAMILY=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "Model\s*Family" | sed -E "s/Model\s*Family\s*:*//i" | xargs 2>/dev/null)
+  DISK_FAMILY=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "Model\s*Family" | sed -E "s/[\"\']//g" | sed -E "s/Model\s*Family\s*:*//i" | xargs 2>/dev/null)
   # lsblk
   if [ "$DISK_FAMILY" == "" ];
   then
@@ -258,18 +258,18 @@ function show_disk_info {
   # Seriennummer (Serial)
   # --------------------------------
   # smartctl
-  DISK_SERIAL=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "serial\s*number" | cut -d":" -f 2 | xargs 2>/dev/null)
+  DISK_SERIAL=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "serial\s*number" | cut -d":" -f 2 | sed -E "s/[\"\']//g" | xargs 2>/dev/null)
   # lsblk
-  if [ "$DISK_SERIAL" == "" ];
+  if [ ${#DISK_SERIAL} -lt 5 ];
   then
     DISK_SERIAL=$(LANG=en lsblk -d -n -o serial ${DEVICE_NAME} 2>/dev/null | head -n 1 | xargs 2>/dev/null)
   fi
   # udevadm
-  if [ "$DISK_SERIAL" == "" ];
+  if [ ${#DISK_SERIAL} -lt 5 ];
   then
     if udevadm --version &>/dev/null;
     then
-      DISK_SERIAL=$(LANG=en udevadm info --name=${DEVICE_NAME} 2>/dev/null | grep -i -E "\s*E:\s*ID_SERIAL_SHORT\s*=" | head -n 1 | sed -E "s/\s*E:\s*ID_SERIAL_SHORT\s*=//i" | xargs 2>/dev/null)
+      DISK_SERIAL=$(LANG=en udevadm info --name=${DEVICE_NAME} 2>/dev/null | grep -i -E "\s*E:\s*ID_SERIAL_SHORT\s*=" | head -n 1 | sed -E "s/[\"\']//g" | sed -E "s/\s*E:\s*ID_SERIAL_SHORT\s*=//i" | xargs 2>/dev/null)
     fi
   fi
   # Ausgabe bereinigen
@@ -280,7 +280,7 @@ function show_disk_info {
   # --------------------------------
   NUMBER_HAS_FORMAT=0
   # smartctl
-  DISK_CAPACITY=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "user\s*capacity" | cut -d ":" -f 2 | awk '{print $1}' | sed "s/[^0-9]//g" | xargs 2>/dev/null)
+  DISK_CAPACITY=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "user\s*capacity" | cut -d ":" -f 2 | awk '{print $1}' | sed -E "s/[\"\']//g" | sed "s/[^0-9]//g" | xargs 2>/dev/null)
   # lsblk
   if [ "$DISK_CAPACITY" == "" ];
   then

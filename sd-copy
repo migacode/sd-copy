@@ -39,8 +39,8 @@
 #   über https://migano.de oder per E-Mail an kontakt@migano.de. Danke.        #
 #                                                                              #
 ################################################################################
-# Letzte Änderung: 10.04.2025
-VERSION="1.56"
+# Letzte Änderung: 22.04.2025
+VERSION="1.58"
 
 ################################################################################
 #                                                                              #
@@ -138,7 +138,8 @@ function get_disk_letter {
        [ "$first_new_char" == "" ];
     then
       if [ "sd${device_char}" != "$boot_device" ] &&
-         [ -b "/dev/sd${device_char}1" ];
+         [ -b "/dev/sd${device_char}" ];
+         # Alternativ: Nur gemountete erkennen >= "/dev/sd${device_char}1"
       then
         already_exists=0
         c=0
@@ -215,54 +216,77 @@ function show_disk_info {
   if [ "$SHOW_CAPACITY" == "" ]; then SHOW_CAPACITY=0; fi
   MAX_INFO_LENGTH="$3"
   if [ "$MAX_INFO_LENGTH" == "" ]; then MAX_INFO_LENGTH=24; fi
+  #-----------------------------------------------------------------------------
+  # Ausgeworfene Geräte neu verbinden um alle Informationen auslesen zu können
+  #-----------------------------------------------------------------------------
+  DEVICE_RECONNECTED=0
+  if [ "${DEVICE_NAME}" != "/dev/$boot_device" ] &&
+     [ $(ls -la ${DEVICE_NAME}* 2>/dev/null | wc -l ) -eq 1 ];
+  then
+    eject -t ${DEVICE_NAME} &>/dev/null
+    if [ $? -eq 0 ];
+    then
+      DEVICE_RECONNECTED=1
+    fi
+  fi
   # --------------------------------
   # Hersteller (Family / Vendor)
   # --------------------------------
-  # smartctl
-  DISK_FAMILY=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "Model\s*Family" | sed -E "s/[\"\']//g" | sed -E "s/Model\s*Family\s*:*//i" | xargs 2>/dev/null)
   # lsblk
-  if [ "$DISK_FAMILY" == "" ];
+  DISK_FAMILY=$(LANG=en lsblk -d -n -o vendor ${DEVICE_NAME} 2>/dev/null | head -n 1 | sed -E "s/[\"\']//g" | xargs 2>/dev/null)
+  # smartctl (1)
+  if [ "$DISK_FAMILY" == "" ] || [ "$DISK_FAMILY" == "ATA" ] || [ "$DISK_FAMILY" == "USB" ];
   then
-    DISK_FAMILY=$(LANG=en lsblk -d -n -o vendor ${DEVICE_NAME} 2>/dev/null | head -n 1 | xargs 2>/dev/null)
+    DISK_FAMILY=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "^\s*vendor\s*:" | sed -E "s/[\"\']//g" | cut -d":" -f 2 | xargs 2>/dev/null)
+  fi
+  # smartctl (2)
+  if [ "$DISK_FAMILY" == "" ] || [ "$DISK_FAMILY" == "ATA" ] || [ "$DISK_FAMILY" == "USB" ];
+  then
+    DISK_FAMILY=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "^s*model\s*family\s*:" | sed -E "s/[\"\']//g" | cut -d":" -f 2 | xargs 2>/dev/null)
   fi
   # Ausgabe bereinigen
-  DISK_FAMILY=$(echo ${DISK_FAMILY//_/ } | sed -E "s/^ATA//" | sed -E "s/^USB//" | xargs 2>/dev/null)
+  DISK_FAMILY=$(echo ${DISK_FAMILY//_/ } | sed -E "s/^ATA\s*//" | sed -E "s/^USB\s*//" | xargs 2>/dev/null)
   if [ ${#DISK_FAMILY} -gt $MAX_INFO_LENGTH ]; then DISK_FAMILY=${DISK_FAMILY:0:$MAX_INFO_LENGTH}; fi
   # --------------------------------
   # Bezeichnung (Model)
   # --------------------------------
-  # smartctl
-  DISK_MODEL=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "device\s*model" | cut -d":" -f 2 | xargs 2>/dev/null)
   # lsblk
+  DISK_MODEL=$(LANG=en lsblk -d -n -o model ${DEVICE_NAME} 2>/dev/null | head -n 1 | sed -E "s/[\"\']//g" | xargs 2>/dev/null)
+  # smartctl (1)
   if [ "$DISK_MODEL" == "" ];
   then
-    DISK_MODEL=$(LANG=en lsblk -d -n -o model ${DEVICE_NAME} 2>/dev/null | head -n 1 | xargs 2>/dev/null)
+    DISK_MODEL=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "^\s*device\s*model\s*:" | sed -E "s/[\"\']//g" | cut -d":" -f 2 | xargs 2>/dev/null)
+  fi
+  # smartctl (2)
+  if [ "$DISK_MODEL" == "" ];
+  then
+    DISK_MODEL=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "^\s*product\s*:" | sed -E "s/[\"\']//g" | cut -d":" -f 2 | xargs 2>/dev/null)
   fi
   # parted
   if [ "$DISK_MODEL" == "" ];
   then
-    DISK_MODEL=$(LANG=en parted -s ${DEVICE_NAME} print 2>/dev/null | grep -i -E "^model" | cut -d":" -f 2 | xargs 2>/dev/null)
+    DISK_MODEL=$(LANG=en parted -s ${DEVICE_NAME} print 2>/dev/null | grep -i -E "^\s*model\s*:" | sed -E "s/[\"\']//g" | cut -d":" -f 2 | xargs 2>/dev/null)
   fi
   # udevadm
   if [ "$DISK_MODEL" == "" ];
   then
     if udevadm --version &>/dev/null;
     then
-      DISK_MODEL=$(LANG=en udevadm info --name=${DEVICE_NAME} 2>/dev/null | grep -i -E ".*id_model=" | cut -d"=" -f 2 | xargs 2>/dev/null)
+      DISK_MODEL=$(LANG=en udevadm info --name=${DEVICE_NAME} 2>/dev/null | grep -i -E ".*id_model=" | sed -E "s/[\"\']//g" | cut -d"=" -f 2 | xargs 2>/dev/null)
     fi
   fi
   # Ausgabe bereinigen
-  DISK_MODEL=$(echo ${DISK_MODEL//_/ } | xargs 2>/dev/null)
+  DISK_MODEL=$(echo ${DISK_MODEL//_/ } | sed -E "s/^ATA\s*//" | sed -E "s/^USB\s*//" | xargs 2>/dev/null)
   if [ ${#DISK_MODEL} -gt $MAX_INFO_LENGTH ]; then DISK_MODEL=${DISK_MODEL:0:$MAX_INFO_LENGTH}; fi
   # --------------------------------
   # Seriennummer (Serial)
   # --------------------------------
-  # smartctl
-  DISK_SERIAL=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "serial\s*number" | cut -d":" -f 2 | sed -E "s/[\"\']//g" | xargs 2>/dev/null)
   # lsblk
+  DISK_SERIAL=$(LANG=en lsblk -d -n -o serial ${DEVICE_NAME} 2>/dev/null | head -n 1 | sed -E "s/[\"\']//g" | xargs 2>/dev/null)
+  # smartctl
   if [ ${#DISK_SERIAL} -lt 5 ];
   then
-    DISK_SERIAL=$(LANG=en lsblk -d -n -o serial ${DEVICE_NAME} 2>/dev/null | head -n 1 | xargs 2>/dev/null)
+    DISK_SERIAL=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "^\s*serial\s*number\s*:" | sed -E "s/[\"\']//g" | cut -d":" -f 2| xargs 2>/dev/null)
   fi
   # udevadm
   if [ ${#DISK_SERIAL} -lt 5 ];
@@ -279,22 +303,20 @@ function show_disk_info {
   # Kapazität
   # --------------------------------
   NUMBER_HAS_FORMAT=0
-  # smartctl
-  DISK_CAPACITY=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "user\s*capacity" | cut -d ":" -f 2 | awk '{print $1}' | sed -E "s/[\"\']//g" | sed "s/[^0-9]//g" | xargs 2>/dev/null)
   # lsblk
+  DISK_CAPACITY=$(LANG=en lsblk -d -n -o size ${DEVICE_NAME} 2>/dev/null | head -n 1 | sed -E "s/[\"\']//g" | xargs 2>/dev/null)
+  # smartctl
   if [ "$DISK_CAPACITY" == "" ];
   then
-    DISK_CAPACITY=$(LANG=en lsblk -d -n -o size ${DEVICE_NAME} 2>/dev/null | head -n 1 | xargs 2>/dev/null)
-    # Wenn die Ausgabe schon formatiert ist, diese nicht mehr neu formatieren
-    if [ $(echo ${DISK_CAPACITY} | grep -c -i -E "[KMGT]") -gt 0 ]; then NUMBER_HAS_FORMAT=1; fi
+    DISK_CAPACITY=$(LANG=en smartctl -x -d sat,auto ${DEVICE_NAME} 2>/dev/null | grep -i -E "^\s*user\s*capacity\s*:" | sed -E "s/[\"\']//g" | cut -d ":" -f 2 | awk '{print $1}' | sed "s/[^0-9]//g" | xargs 2>/dev/null)
   fi
   # parted
   if [ "$DISK_CAPACITY" == "" ];
   then
-    DISK_CAPACITY=$(LANG=en parted -s ${DEVICE_NAME} print 2>/dev/null | grep -i -E "^Disk ${DEVICE_NAME}" | cut -d":" -f 2 | xargs 2>/dev/null)
-    # Wenn die Ausgabe schon formatiert ist, diese nicht mehr neu formatieren
-    if [ $(echo ${DISK_CAPACITY} | grep -c -i -E "[KMGT]") -gt 0 ]; then NUMBER_HAS_FORMAT=1; fi
+    DISK_CAPACITY=$(LANG=en parted -s ${DEVICE_NAME} print 2>/dev/null | grep -i -E "^Disk ${DEVICE_NAME}" | sed -E "s/[\"\']//g" | cut -d":" -f 2 | xargs 2>/dev/null)
   fi
+  # Wenn die Ausgabe schon formatiert ist, diese nicht mehr neu formatieren
+  if [ $(echo ${DISK_CAPACITY} | grep -c -i -E "[BKMGT]") -gt 0 ]; then NUMBER_HAS_FORMAT=1; fi
   if [ $NUMBER_HAS_FORMAT -eq 0 ] &&
      [ "$DISK_CAPACITY" != "" ];
   then
@@ -306,9 +328,21 @@ function show_disk_info {
   else
     DISK_SIZE="$DISK_CAPACITY"
   fi
+  if [ "$DISK_SIZE" == "0" ] ||
+     [ "$DISK_SIZE" == "0B" ];
+  then
+    DISK_SIZE=""
+  fi
   DISK_CAPACITY="$DISK_SIZE"
   # Ausgabe bereinigen
   if [ ${#DISK_CAPACITY} -gt $MAX_INFO_LENGTH ]; then DISK_CAPACITY=${DISK_CAPACITY:0:$MAX_INFO_LENGTH}; fi
+  #-----------------------------------------------------------------------------
+  # Vormals ausgeworfene und durch uns neu verbundene Geräte wieder auswerfen
+  #-----------------------------------------------------------------------------
+  if [ $DEVICE_RECONNECTED -eq 1 ];
+  then
+    eject ${DEVICE_NAME} &>/dev/null
+  fi
   # ------------------
   # Start der Ausgabe
   # ------------------
@@ -322,9 +356,9 @@ function show_disk_info {
     then
       echo -e -n  " ${light_blue}$DISK_CAPACITY${colors_off}"
     fi
+    # if [ "$DISK_FAMILY" != "" ]; then echo -e -n  " ${light_blue}$DISK_FAMILY${colors_off}"; fi
     if [ "$DISK_MODEL"  != "" ]; then echo -e -n  " ${light_blue}$DISK_MODEL${colors_off}"; fi
     if [ "$DISK_SERIAL" != "" ]; then echo -e -n  " ${light_blue}[$DISK_SERIAL]${colors_off}"; fi
-    # if [ "$DISK_FAMILY" != "" ]; then echo -e -n  " ${light_blue}$DISK_FAMILY${colors_off}"; fi
   else
     echo -e -n " ${dark_grey}[keine weiteren Angaben]${colors_off}"
   fi
@@ -558,10 +592,18 @@ echo -e "$HEADLINE_TEXT"
 # Kommandozeilen-Parameter einlesen und entsprechende Optionen setzen
 #===============================================================================
 DEFAULT_DEEPMODE="n"
+BOOTSECTOR_ONLY=0
 CHECK_UPDATE=1
 for arg in $@;
 do
   arg=$(printf %b "${arg}" | tr A-Z a-z)
+  # ----------------------------------------------------------------------------
+  # bootonly
+  # ----------------------------------------------------------------------------
+  if [ "$arg" == "--bootonly" ] || [ "$arg" == "-b" ];
+  then
+    BOOTSECTOR_ONLY=1
+  fi
   # ----------------------------------------------------------------------------
   # deep
   # ----------------------------------------------------------------------------
@@ -581,7 +623,8 @@ do
     echo -e " Syntax: sudo ${0} [Optionen]"
     echo -e ""
     echo -e " Optionen:"
-    echo -e "  -d, --deep      Verwendet den Deep-Modus (dd) als Standard."
+    echo -e "  -b, --bootonly  Kopiert nur den Bootsektor (MBR) und keine sonstigen Daten."
+    echo -e "  -d, --deep      Setzt den Deep-Modus (dd) als Vorgabe für den Kopiermodus."
     echo -e "  -h, --help      Zeigt diese Seite an."
     echo -e "  -n, --noupdate  Sucht nicht nach Updates für dieses Skript."
     exit 0
@@ -642,7 +685,7 @@ then
           fi
           exit 1
         else
-          echo -e "$ERROR_TAG: Sicherung konnte nicht angelegt werden"
+          echo -e " $ERROR_TAG: Sicherung konnte nicht angelegt werden"
         fi
       else
         remove_file "$LOCAL_DOWNLOAD_FILE"
@@ -930,7 +973,7 @@ then
 fi
 
 #===============================================================================
-# Durchführung des Kopiervorgangs
+# Durchführung des Kopier-Vorgangs
 # -----------------------------------------------------------
 # Wenn Clonezilla nicht installiert ist, dann nur den Deep-Modus (dd)
 # zulassen. Ansonsten fragen, welcher Modus verwendet werden soll ...
@@ -944,10 +987,10 @@ echo -e ""
 if [ -f "/usr/sbin/ocs-onthefly" ];
 then
   echo -e " $HINWEIS_TAG: Im Standard werden nur die Sektoren kopiert, welche auch mit Daten"
-  echo -e " belegt sind, wodurch der Kopier-Vorgang ganz erheblich beschleunigt wird."
-  echo -e " Um auch unbelegte Sektoren und damit eventuell versteckte Daten zu kopieren,"
-  echo -e " kann der Deep-Mode (Klonen mit dd) verwendet werden, was je nach Belegung"
-  echo -e " allerdings sehr viel länger (einige Stunden) dauern kann!"
+  echo -e " belegt sind, wodurch der Kopier-Vorgang ganz erheblich beschleunigt werden"
+  echo -e " kann. Um zudem auch alle unbelegten Sektoren zu kopieren, kann statt dessen"
+  echo -e " der Deep-Mode (Klonen mit dd) verwendet werden, was je nach Belegung der"
+  echo -e " Quelle allerdings sehr viel länger (bis zu einigen Stunden) dauern kann!"
   echo -e ""
   ask_yes_or_no "Soll der Deep-Mode verwendet werden?" "$DEFAULT_DEEPMODE"
   deep_mode=$?
@@ -968,6 +1011,9 @@ echo -e ""
 # Sicherheitsabfragen
 # ------------------------------------------------------------------------------
 echo -e " Sorry, die obligatorische Sicherheits-Frage muss ich natürlich noch stellen:"
+echo -e -n " Das Ziel ist ${bold_white}$dest_device${colors_off}"
+show_disk_info "$dest_device" "1" "20"
+echo -e ""
 ask_yes_or_no "Soll ${bold_yellow}$source_device${colors_off} auf ${bold_yellow}$dest_device${colors_off} kopiert werden?" ""
 if [ $? -eq 1 ];
 then
@@ -982,31 +1028,46 @@ then
     # --------------------------------------------------------------------------
     echo -e ""
     echo -e -n " Hänge alle betroffenen Partitionen aus ... "
+
+    #-----------------------------------------------------------
+    # Vorher eventuell ausgeworfene Geräte wieder neu verbinden
+    #-----------------------------------------------------------
+    if [ "/dev/${source_device}" != "/dev/$boot_device" ] &&
+       [ $(ls -la /dev/${source_device}* 2>/dev/null | wc -l ) -eq 1 ];
+    then
+      eject -t /dev/${source_device} &>/dev/null
+    fi
+    if [ "/dev/${dest_device}" != "/dev/$boot_device" ] &&
+       [ $(ls -la /dev/${dest_device}* 2>/dev/null | wc -l ) -eq 1 ];
+    then
+      eject -t /dev/${dest_device} &>/dev/null
+    fi
+
     UMOUNTS_RESULT=0
-    # -----------------------------------
-    # Alle Partitionen des Quell-Mediums
-    # -----------------------------------
+    # ---------------------------------------------
+    # Alle Partitionen des Quell-Mediums aushängen
+    # ---------------------------------------------
     p=1;
     while [ $p -lt 100 ] &&
           [ $UMOUNTS_RESULT -eq 0 ];
     do
       if [ $(df | grep -i -c -E "\/dev\/${source_device}${p}") -ne 0 ];
       then
-        umount "/dev/${source_device}${p}" # &>/dev/null
+        umount "/dev/${source_device}${p}" &>/dev/null
         UMOUNTS_RESULT=$?
       fi
       ((p+=1))
     done
-    # ----------------------------------
-    # Alle Partitionen des Ziel-Mediums
-    # ----------------------------------
+    # --------------------------------------------
+    # Alle Partitionen des Ziel-Mediums aushängen
+    # --------------------------------------------
     p=1;
     while [ $p -lt 100 ] &&
           [ $UMOUNTS_RESULT -eq 0 ];
     do
       if [ $(df | grep -i -c -E "\/dev\/${dest_device}${p}") -ne 0 ];
       then
-        umount "/dev/${dest_device}${p}" # &>/dev/null
+        umount "/dev/${dest_device}${p}" &>/dev/null
         UMOUNTS_RESULT=$?
       fi
       ((p+=1))
@@ -1020,46 +1081,53 @@ then
       echo -e " Das Skript kann daher leider nicht fortgeführt werden."
       exit 1
     fi
+
     # --------------------------------------------------------------------------
-    # A) Standard
-    # ------------
-    # Alle Partitionen mit "ocs-onthefly" kopieren
+    # Kopieren
     # --------------------------------------------------------------------------
     echo -e " Starte Kopier-Vorgang von ${bold_yellow}$source_device${colors_off} nach ${bold_yellow}$dest_device${colors_off} ..."
     echo -e "$FULL_LINE"
-    if [ $deep_mode -ne 1 ];
+    COPY_RESULT=0
+
+    # ----------------------------------------------------------
+    # Alle Partitionen mit "ocs-onthefly" (Clonezilla) kopieren
+    # ----------------------------------------------------------
+    if [ $deep_mode -eq 0 ] &&
+       [ $BOOTSECTOR_ONLY -eq 0 ];
     then
       /usr/sbin/ocs-onthefly -batch -e1 auto -e2 -icds -iui -ius -j2 -rvd -nogui -pa true --source ${source_device} --target ${dest_device}
       COPY_RESULT=$?
-      echo -e "$FULL_LINE"
-      if [ $COPY_RESULT -eq 0 ];
-      then
-        # ---------------------------------------------------------------------
-        # Bootloader kopieren
-        # (wird unter Umständen zuvor durch ocs-onthefly auf dem Ziel gelöscht
-        # bzw. überschrieben, obwohl Option -j2 das von selbst tun sollte ...)
-        # ---------------------------------------------------------------------
-        echo -e -n " Kopiere Bootloader ... "
-        dd conv=noerror,sync if=/dev/${source_device} of=/dev/${dest_device} bs=512 count=4 &>/dev/null
-        COPY_RESULT=$?
-        if [ $COPY_RESULT -eq 0 ];
-        then
-          echo -e "$OK_TAG"
-        else
-          echo -e "$ERROR_TAG"
-        fi
-      fi
-    # --------------------------------------------------------------------------
-    # B) Deep-Mode
-    # -------------
-    # Ganzes Medium mit "dd" klonen und dabei Lese-Fehler ignorieren
-    # --------------------------------------------------------------------------
-    else
+    fi
+
+    # -----------------------------------------------------------------
+    # Gesamtes Medium mit "dd" klonen und dabei Lese-Fehler ignorieren
+    # -----------------------------------------------------------------
+    if [ $deep_mode -eq 1 ] &&
+       [ $BOOTSECTOR_ONLY -eq 0 ];
+    then
       dd conv=noerror,sync if=/dev/${source_device} of=/dev/${dest_device} status=progress
       COPY_RESULT=$?
     fi
+
+    # --------------------------
+    # Bootsektor (MBR) kopieren
+    # --------------------------
+    if [ $COPY_RESULT -eq 0 ];
+    then
+      echo -e "$FULL_LINE"
+      echo -e -n " Kopiere Bootsektor (MBR) ... "
+      dd conv=noerror,sync if=/dev/${source_device} of=/dev/${dest_device} bs=512 count=1 &>/dev/null
+      COPY_RESULT=$?
+      if [ $COPY_RESULT -eq 0 ];
+      then
+        echo -e "$OK_TAG"
+      else
+        echo -e "$ERROR_TAG"
+      fi
+    fi
+
     # --------------------------------------------------------------------------
-    # Ende des Kopiervorgangs
+    # Ende des Kopier-Vorgangs
     # --------------------------------------------------------------------------
     echo -e "$FULL_LINE"
     if [ $COPY_RESULT -eq 0 ];

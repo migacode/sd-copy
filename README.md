@@ -10,12 +10,11 @@ Zudem ist es auch möglich, nur den Bootloader alleine zu kopieren, was bei der 
 <br />
 <br />
 <b>Optionen zum Aufruf per Kommandozeile:</b><br />
-<code>
-&nbsp;&nbsp;-a,&nbsp;&nbsp;--automode&nbsp;&nbsp;Startet immer direkt den automatischen Modus.<br />
-&nbsp;&nbsp;-b,&nbsp;&nbsp;--bootonly&nbsp;&nbsp;Kopiert nur den Bootsektor (MBR) und keine sonstigen Daten.<br />
-&nbsp;&nbsp;-d,&nbsp;&nbsp;--deep&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Setzt den Deep-Modus (dd) als Vorgabe für den Kopiermodus.<br />
-&nbsp;&nbsp;-h,&nbsp;&nbsp;--help&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Zeigt die Hilfe an.<br />
-&nbsp;&nbsp;-n,&nbsp;&nbsp;--noupdate&nbsp;&nbsp;Sucht nicht nach Updates für dieses Skript.<br />
+<code>  -a,  --automode  Startet immer direkt den automatischen Modus.<br />
+  -b,  --bootonly  Kopiert nur den Bootsektor (MBR) und keine sonstigen Daten.<br />
+  -d,  --deep      Setzt den Deep-Modus (dd) als Vorgabe für den Kopiermodus.<br />
+  -h,  --help      Zeigt die Hilfe an.<br />
+  -n,  --noupdate  Sucht nicht nach Updates für dieses Skript.<br />
 </code>
 <hr>
 <br />

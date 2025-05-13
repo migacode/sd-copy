@@ -12,7 +12,7 @@ Zudem ist es auch möglich, nur den Bootloader alleine zu kopieren, was bei der 
 <img src="./img/sd-copy_screen_2.png">
 <br />
 <br />
-<b>Download</b> SD-Copy&nbsp;&raquo;&nbsp;<a href="https://github.com/migacode/home-assistant/blob/main/sd-copy"><strong>sd-copy</strong></a><br />
+<b>Download</b> SD-Copy&nbsp;&raquo;&nbsp;<a href="https://github.com/migacode/sd-copy/blob/main/sd-copy"><strong>sd-copy</strong></a><br />
 (Nach dem Download "<b>chmod a+x</b>" nicht vergessen ;)
 <br />
 <br />

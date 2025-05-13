@@ -6,6 +6,7 @@ Bei dem Kopiervorgang werden dann wahlweise nur die belegten oder alle Sektoren 
 Darüber hinaus wird auch immer der erste Sektor des Speichermediums mit dem Bootloader (MBR) kopiert, so dass dieser auf der Kopie nicht mehr nachträglich mit externen Tools korrigiert werden muss.<br />
 Zudem ist es auch möglich, nur den Bootloader alleine zu kopieren, was bei der Reparatur nicht mehr startfähiger Systeme hilfreich sein kann.<br />
 <br />
+<img src="./img/sd-copy_screen_1.png">
 (Nach dem Download "<b>chmod a+x</b>" nicht vergessen ;)
 <br />
 <br />

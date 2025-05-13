@@ -24,6 +24,6 @@ Zudem ist es auch möglich, nur den Bootloader alleine zu kopieren, was bei der 
   -h, --help      Zeigt die Hilfe an.<br />
   -n, --noupdate  Sucht nicht nach Updates für dieses Skript.<br />
 </code>
-<hr>
 <br />
+<hr>
 Sämtliche Software auf diesen Seiten wird ohne Mängelgewähr und ohne jegliche ausdrückliche oder stillschweigende Garantie zur Verfügung gestellt, einschließlich und ohne Einschränkung jeglicher Garantie für die Gebrauchstauglichkeit oder Eignung für einen bestimmten Zweck. Alle Risiken in Bezug auf Ergebnisse und Leistung dieser Software werden vollständig vom Benutzer übernommen!

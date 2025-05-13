@@ -9,11 +9,11 @@ Zudem ist es auch möglich, nur den Bootloader alleine zu kopieren, was bei der 
 (Nach dem Download "<b>chmod a+x</b>" nicht vergessen ;)
 <br />
 <b>Optionen:</b><br />
-&nbsp;&nbsp;-a, --automode  Startet immer direkt den automatischen Modus.
-&nbsp;&nbsp;-b, --bootonly  Kopiert nur den Bootsektor (MBR) und keine sonstigen Daten.
-&nbsp;&nbsp;-d, --deep      Setzt den Deep-Modus (dd) als Vorgabe für den Kopiermodus.
-&nbsp;&nbsp;-h, --help      Zeigt die Hilfe an.
-&nbsp;&nbsp;-n, --noupdate  Sucht nicht nach Updates für dieses Skript.
+&nbsp;&nbsp;-a, --automode  Startet immer direkt den automatischen Modus.<br />
+&nbsp;&nbsp;-b, --bootonly  Kopiert nur den Bootsektor (MBR) und keine sonstigen Daten.<br />
+&nbsp;&nbsp;-d, --deep      Setzt den Deep-Modus (dd) als Vorgabe für den Kopiermodus.<br />
+&nbsp;&nbsp;-h, --help      Zeigt die Hilfe an.<br />
+&nbsp;&nbsp;-n, --noupdate  Sucht nicht nach Updates für dieses Skript.<br />
 <hr>
 <br />
 Sämtliche Software auf diesen Seiten wird ohne Mängelgewähr und ohne jegliche ausdrückliche oder stillschweigende Garantie zur Verfügung gestellt, einschließlich und ohne Einschränkung jeglicher Garantie für die Gebrauchstauglichkeit oder Eignung für einen bestimmten Zweck. Alle Risiken in Bezug auf Ergebnisse und Leistung dieser Software werden vollständig vom Benutzer übernommen!

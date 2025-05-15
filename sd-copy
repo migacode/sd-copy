@@ -162,6 +162,23 @@ function create_starter {
     # --------------------------------
     download_icon_file "sd-copy"
     echo -e "$OK_TAG"
+    # --------------------------------------------------------------------------
+    # Zuvor erstellten Starter für uns selbst auch im System-Menü anlegen
+    # --------------------------------------------------------------------------
+    # Auf diese Art, damit die vom System automatisch eingefügten Steuerzeichen
+    # dabei entfernt werden, da Letztere die Menü-Darstellung unterbinden.
+    # --------------------------------------------------------------------------
+    STARTMENU_DIR="$USER_HOME_DIR/.local/share/applications"
+    STARTMENU_FILE="$STARTMENU_DIR/${STARTER_FILE##*/}"
+    if [ -s "$STARTER_FILE" ] &&
+       [ -d "$STARTMENU_DIR" ] &&
+       [ ! -s "$STARTMENU_FILE" ];
+    then
+      cat "$STARTER_FILE" | tr -dc '[:print:]\n' > "$STARTMENU_FILE" 2>/dev/null
+      sed -i -E "s/\\\n\(Terminal\)//i" "$STARTMENU_FILE"
+      chown -R "$USER_USERNAME:$USER_USERNAME" "$STARTMENU_FILE" &>/dev/null
+      chmod -R 0644 "$STARTMENU_FILE" &>/dev/null
+    fi
   else
     echo -e "$ERROR_TAG"
   fi

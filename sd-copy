@@ -250,11 +250,13 @@ function get_disk_letter {
         then
           TEST_CAPACITY=$(show_disk_info "sd$device_char" 1 20 1)
           if [ "$TEST_CAPACITY" != "" ] &&
-            [ "$TEST_CAPACITY" != "0" ];
+             [ "$TEST_CAPACITY" != "0" ];
           then
             first_new_char="$device_char"
             device_list[${devices_in_list}]="$device_char"
             devices_in_list=${#device_list[@]}
+          else
+            eject "/dev/sd$device_char" &>/dev/null
           fi
         fi
       fi
@@ -438,11 +440,16 @@ function show_disk_info {
   # Ausgabe bereinigen
   if [ ${#DISK_CAPACITY} -gt $MAX_INFO_LENGTH ]; then DISK_CAPACITY=${DISK_CAPACITY:0:$MAX_INFO_LENGTH}; fi
   #-----------------------------------------------------------------------------
-  # Vormals ausgeworfene und durch uns neu verbundene Geräte wieder auswerfen
+  # Vormals ausgeworfene und durch uns neu verbundene Geräte wieder auswerfen,
+  # sofern diese nicht brauchbar sind
   #-----------------------------------------------------------------------------
   if [ $DEVICE_RECONNECTED -eq 1 ];
   then
-    eject ${DEVICE_NAME} &>/dev/null
+    if [ "$DISK_CAPACITY" == "" ] ||
+       [ "$DISK_CAPACITY" == "0" ];
+    then
+      eject ${DEVICE_NAME} &>/dev/null
+    fi
   fi
   # ------------------
   # Start der Ausgabe

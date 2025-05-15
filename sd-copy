@@ -39,8 +39,8 @@
 #   über https://migano.de oder per E-Mail an kontakt@migano.de. Danke.        #
 #                                                                              #
 ################################################################################
-# Letzte Änderung: 13.05.2025
-VERSION="1.60"
+# Letzte Änderung: 15.05.2025
+VERSION="1.70"
 
 ################################################################################
 #                                                                              #
@@ -88,6 +88,83 @@ function ask_yes_or_no {
     IYN_RESULT=1
   fi
   return $IYN_RESULT
+}
+
+#===============================================================================
+# Erstellung eines Starters auf dem Desktop und im Anwendungs-Menü
+# Parameter $1: Einschließlich der Kommandozeilen-Optionen (1) oder ohne (0)
+#===============================================================================
+function create_starter {
+  STARTER_FILE="$DESKTOP_DIR/$SCRIPT_NAME"
+  STARTER_NAME="SD-Copy"
+  SCRIPT_CALL="$SCRIPT_NAME"
+  if [ $1 -eq 1 ];
+  then
+    STARTER_NAME+=" ("
+    # automode
+    if [ $AUTOMATIC_MODE -eq 1 ];
+    then
+      STARTER_FILE+="_a"
+      STARTER_NAME+="A"
+      SCRIPT_CALL+=" -a"
+    fi
+    # bootonly
+    if [ $BOOTSECTOR_ONLY -eq 1 ];
+    then
+      STARTER_FILE+="_b"
+      STARTER_NAME+="B"
+      SCRIPT_CALL+=" -b"
+    fi
+    # deepmode
+    if [ $USE_DEEPMODE -eq 1 ];
+    then
+      STARTER_FILE+="_d"
+      STARTER_NAME+="D"
+      SCRIPT_CALL+=" -d"
+    fi
+    # noupdate
+    if [ $CHECK_UPDATE -eq 0 ];
+    then
+      STARTER_FILE+="_n"
+      STARTER_NAME+="N"
+      SCRIPT_CALL+=" -n"
+    fi
+    # ocsmode
+    if [ $USE_OCSMODE -eq 1 ];
+    then
+      STARTER_FILE+="_o"
+      STARTER_NAME+="O"
+      SCRIPT_CALL+=" -o"
+    fi
+    STARTER_NAME+=")"
+  fi
+  STARTER_FILE+=".desktop"
+  echo -e -n " Erstelle Starter ... "
+  echo -e "[Desktop Entry]" > "$STARTER_FILE" 2>/dev/null
+  if [ $? -eq 0 ];
+  then
+    # ------------------
+    # Starter erstellen
+    # ------------------
+    echo -e "Type=Application" >> "$STARTER_FILE" 2>/dev/null
+    echo -e "Name=$STARTER_NAME" >> "$STARTER_FILE" 2>/dev/null
+    echo -e "Comment=Simple Disk Copy im Terminal starten" >> "$STARTER_FILE" 2>/dev/null
+    echo -e "Exec=bash -c 'cd $SCRIPT_PATH && sudo ./$SCRIPT_CALL;\$SHELL'" >> "$STARTER_FILE" 2>/dev/null
+    echo -e "Icon=sd-copy" >> "$STARTER_FILE" 2>/dev/null
+    echo -e "Categories=Application;" >> "$STARTER_FILE" 2>/dev/null
+    echo -e "Terminal=true" >> "$STARTER_FILE" 2>/dev/null
+    echo -e "StartupNotify=true" >> "$STARTER_FILE" 2>/dev/null
+    echo -e "NoDisplay=false" >> "$STARTER_FILE" 2>/dev/null
+    chown -R "$USER_USERNAME:$USER_USERNAME" "$STARTER_FILE" &>/dev/null
+    chmod -R 0755 "$STARTER_FILE" &>/dev/null
+    # --------------------------------
+    # Icon für den Starter downloaden
+    # --------------------------------
+    download_icon_file "sd-copy"
+    echo -e "$OK_TAG"
+  else
+    echo -e "$ERROR_TAG"
+  fi
 }
 
 #===============================================================================
@@ -583,11 +660,13 @@ fi
 # ACHTUNG: Angaben OHNE Slash (/) am Ende!
 #===============================================================================
 DESKTOP_DIR=""
-if [ -d "/home/$USER_USERNAME/Schreibtisch" ];
+if [ -d "/home/$USER_USERNAME/Schreibtisch" ] &&
+   [ ! -L "/home/$USER_USERNAME/Schreibtisch" ];
 then
   DESKTOP_DIR="/home/$USER_USERNAME/Schreibtisch"
 else
-  if [ -d "/home/$USER_USERNAME/Desktop" ];
+  if [ -d "/home/$USER_USERNAME/Desktop" ] &&
+     [ ! -L "/home/$USER_USERNAME/Desktop" ];
   then
     DESKTOP_DIR="/home/$USER_USERNAME/Desktop"
   fi
@@ -604,10 +683,12 @@ echo -e "$HEADLINE_TEXT"
 #===============================================================================
 # Kommandozeilen-Parameter einlesen und entsprechende Optionen setzen
 #===============================================================================
-DEFAULT_DEEPMODE="n"
-BOOTSECTOR_ONLY=0
 AUTOMATIC_MODE=0
+BOOTSECTOR_ONLY=0
 CHECK_UPDATE=1
+CREATE_STARTER=0
+USE_DEEPMODE=0
+USE_OCSMODE=0
 for arg in $@;
 do
   arg=$(printf %b "${arg}" | tr A-Z a-z)
@@ -628,9 +709,9 @@ do
   # ----------------------------------------------------------------------------
   # deep
   # ----------------------------------------------------------------------------
-  if [ "$arg" == "--deep" ] || [ "$arg" == "-d" ];
+  if [ "$arg" == "--deepmode" ] || [ "$arg" == "-d" ];
   then
-    DEFAULT_DEEPMODE="j"
+    USE_DEEPMODE=1
   fi
   # ----------------------------------------------------------------------------
   # help
@@ -643,12 +724,20 @@ do
     echo -e ""
     echo -e " Syntax: sudo ${0} [Optionen]"
     echo -e ""
-    echo -e " Optionen:"
-    echo -e "  -a, --automode  Startet immer direkt den automatischen Modus."
-    echo -e "  -b, --bootonly  Kopiert nur den Bootsektor (MBR) und keine sonstigen Daten."
-    echo -e "  -d, --deep      Setzt den Deep-Modus (dd) als Vorgabe für den Kopiermodus."
-    echo -e "  -h, --help      Zeigt diese Seite an."
-    echo -e "  -n, --noupdate  Sucht nicht nach Updates für dieses Skript."
+    echo -e " Optionen:\n"
+    echo -e "  -a, --automode  Startet immer direkt den automatischen Medien-Auswahl-Modus.\n"
+    echo -e "  -b, --bootonly  Kopiert nur den Bootsektor (MBR) und keine sonstigen Daten"
+    echo -e "                  (hat Vorrang vor den Optionen ocsmode und deepmode).\n"
+    echo -e "  -d, --deepmode  Verwendet den Deep-Modus (dd) für den Kopier-Vorgang."
+    echo -e "                  Dabei werden sämtliche Sektoren der Quelle kopiert, was"
+    echo -e "                  zu einer sehr langen Dauer des Kopier-Vorgangs führen kann.\n"
+    echo -e "  -h, --help      Zeigt diese Hilfe an.\n"
+    echo -e "  -n, --noupdate  Sucht nicht nach Updates für dieses Skript.\n"
+    echo -e "  -o, --ocsmode   Verwendet den OCS-Modus (Clonezilla) für den Kopier-Vorgang."
+    echo -e "                  Dabei werden nur belegte Sektoren der Quelle kopiert, was"
+    echo -e "                  den Kopiervorgang je nach Belegung erheblich beschleunigt"
+    echo -e "                  (die Option ocsmode hat Vorrang vor der Option deepmode).\n"
+    echo -e "  -s, --starter   Erstellt einen Desktop-Starter mit aktuellen Einstellungen.\n"
     exit 0
   fi
   # ----------------------------------------------------------------------------
@@ -658,7 +747,34 @@ do
   then
     CHECK_UPDATE=0
   fi
+  # ----------------------------------------------------------------------------
+  # ocsmode
+  # ----------------------------------------------------------------------------
+  if [ "$arg" == "--ocsmode" ] || [ "$arg" == "-o" ];
+  then
+    USE_OCSMODE=1
+  fi
+  # ----------------------------------------------------------------------------
+  # starter
+  # ----------------------------------------------------------------------------
+  if [ "$arg" == "--starter" ] || [ "$arg" == "-s" ];
+  then
+    CREATE_STARTER=1
+  fi
 done
+# ------------------------------------------------------------------------------
+# Konflikte bereinigen
+# ------------------------------------------------------------------------------
+if [[ $USE_DEEPMODE -eq 1 && $USE_OCSMODE -eq 1 ]];
+then
+  USE_DEEPMODE=0
+  USE_OCSMODE=1
+fi
+if [ $BOOTSECTOR_ONLY -eq 1 ];
+then
+  USE_DEEPMODE=0
+  USE_OCSMODE=0
+fi
 
 #===============================================================================
 # Aufruf als Superuser prüfen
@@ -668,57 +784,6 @@ then
   echo -e ""
   echo -e " Bitte als Superuser aufrufen!"
   exit 1
-fi
-
-#===============================================================================
-# Auf neuere Version prüfen
-#===============================================================================
-if [ $CHECK_UPDATE -eq 1 ];
-then
-  LOCAL_DOWNLOAD_FILE="./$SCRIPT_NAME.new"
-  wget -nv -O "$LOCAL_DOWNLOAD_FILE" "$THIS_SCRIPT_URL" &>/dev/null
-  if [ $? -eq 0 ] &&
-     [ -s "$LOCAL_DOWNLOAD_FILE" ] &&
-     [ $(grep -i -c -E "Error\s*404" "$LOCAL_DOWNLOAD_FILE") -eq 0 ];
-  then
-    chown -R "$USER_USERNAME:$USER_USERNAME" "$LOCAL_DOWNLOAD_FILE" &>/dev/null
-    chmod -R 0755 "$LOCAL_DOWNLOAD_FILE" &>/dev/null
-    NEW_VERSION=$(grep -i -E "^\s*version=" "$LOCAL_DOWNLOAD_FILE" | sed -E "s/^\s*version=//i" | sed -E "s/\"//g" | xargs 2>/dev/null)
-    OLD_VERSION_VALUE=$(get_version_value ${VERSION})
-    NEW_VERSION_VALUE=$(get_version_value ${NEW_VERSION})
-    if [ $OLD_VERSION_VALUE -lt $NEW_VERSION_VALUE ];
-    then
-      echo -e ""
-      echo -e " Version ${light_yellow}$NEW_VERSION${colors_off} ist verfügbar. Es wird empfohlen, die neue Version zu verwenden."
-      ask_yes_or_no "Alte Version sichern und neue Version verwenden" "j"
-      if [ $? -eq 1 ];
-      then
-        mv -f "${0}" "${0}.bak" &>/dev/null
-        if [ $? -eq 0 ];
-        then
-          echo -e " Alte Version gesichert als ${bold_purple}${0}.bak${colors_off}"
-          mv -f "$LOCAL_DOWNLOAD_FILE" "${0}"
-          if [ $? -eq 0 ];
-          then
-            echo -e " ${bold_white}$SCRIPT_NAME${colors_off} wurde aktualisiert und beendet - bitte jetzt neu aufrufen ... $OK_TAG"
-          else
-            echo -e " $ERROR_TAG: Die Aktualisierung konnte leider ${bold_red}nicht${colors_off} korrekt durchgeführt werden."
-            echo -e " Zum Überspringen der Aktualisierung bitte die Option ${light_cyan}--noupdate${colors_off} verwenden."
-          fi
-          exit 1
-        else
-          echo -e " $ERROR_TAG: Sicherung konnte nicht angelegt werden"
-        fi
-      else
-        remove_file "$LOCAL_DOWNLOAD_FILE"
-      fi
-      echo -e "$FULL_LINE"
-    else
-      remove_file "$LOCAL_DOWNLOAD_FILE"
-    fi
-  else
-    remove_file "$LOCAL_DOWNLOAD_FILE"
-  fi
 fi
 
 #===============================================================================
@@ -799,41 +864,77 @@ then
 fi
 
 #===============================================================================
-# Starter für uns selbst auf dem Desktop anlegen
+# Auf neuere Version prüfen
 #===============================================================================
-STARTER_FILE="$DESKTOP_DIR/$SCRIPT_NAME.desktop"
-if [ ! -s "$STARTER_FILE" ];
+if [ $CHECK_UPDATE -eq 1 ];
 then
-  echo -e ""
-  echo -e " $HINWEIS_TAG: Es scheint kein ${light_cyan}Starter${colors_off} für SD-Copy v$VERSION angelegt zu sein."
-  ask_yes_or_no "Jetzt Starter (Symbol) auf dem Desktop anlegen" "j"
-  if [ $? -eq 1 ];
+  LOCAL_DOWNLOAD_FILE="./$SCRIPT_NAME.new"
+  wget -nv -O "$LOCAL_DOWNLOAD_FILE" "$THIS_SCRIPT_URL" &>/dev/null
+  if [ $? -eq 0 ] &&
+     [ -s "$LOCAL_DOWNLOAD_FILE" ] &&
+     [ $(grep -i -c -E "Error\s*404" "$LOCAL_DOWNLOAD_FILE") -eq 0 ];
   then
-    echo -e -n " Erstelle Starter ... "
-    echo -e "[Desktop Entry]" > "$STARTER_FILE" 2>/dev/null
-    if [ $? -eq 0 ];
+    chown -R "$USER_USERNAME:$USER_USERNAME" "$LOCAL_DOWNLOAD_FILE" &>/dev/null
+    chmod -R 0755 "$LOCAL_DOWNLOAD_FILE" &>/dev/null
+    NEW_VERSION=$(grep -i -E "^\s*version=" "$LOCAL_DOWNLOAD_FILE" | sed -E "s/^\s*version=//i" | sed -E "s/\"//g" | xargs 2>/dev/null)
+    OLD_VERSION_VALUE=$(get_version_value ${VERSION})
+    NEW_VERSION_VALUE=$(get_version_value ${NEW_VERSION})
+    if [ $OLD_VERSION_VALUE -lt $NEW_VERSION_VALUE ];
     then
-      # ------------------
-      # Starter erstellen
-      # ------------------
-      echo -e "Type=Application" >> "$STARTER_FILE" 2>/dev/null
-      echo -e "Name=SD-Copy" >> "$STARTER_FILE" 2>/dev/null
-      echo -e "Comment=Simple Disk Copy im Terminal starten" >> "$STARTER_FILE" 2>/dev/null
-      echo -e "Exec=bash -c 'cd $SCRIPT_PATH && sudo ./sd-copy;\$SHELL'" >> "$STARTER_FILE" 2>/dev/null
-      echo -e "Icon=sd-copy" >> "$STARTER_FILE" 2>/dev/null
-      echo -e "Categories=Application;" >> "$STARTER_FILE" 2>/dev/null
-      echo -e "Terminal=true" >> "$STARTER_FILE" 2>/dev/null
-      echo -e "StartupNotify=true" >> "$STARTER_FILE" 2>/dev/null
-      echo -e "NoDisplay=false" >> "$STARTER_FILE" 2>/dev/null
-      chown -R "$USER_USERNAME:$USER_USERNAME" "$STARTER_FILE" &>/dev/null
-      chmod -R 0755 "$STARTER_FILE" &>/dev/null
-      # --------------------------------
-      # Icon für den Starter downloaden
-      # --------------------------------
-      download_icon_file "sd-copy"
-      echo -e "$OK_TAG"
+      echo -e ""
+      echo -e " Version ${light_yellow}$NEW_VERSION${colors_off} ist verfügbar. Es wird empfohlen, die neue Version zu verwenden."
+      ask_yes_or_no "Alte Version sichern und neue Version verwenden" "j"
+      if [ $? -eq 1 ];
+      then
+        mv -f "${0}" "${0}.bak" &>/dev/null
+        if [ $? -eq 0 ];
+        then
+          echo -e " Alte Version gesichert als ${bold_purple}${0}.bak${colors_off}"
+          mv -f "$LOCAL_DOWNLOAD_FILE" "${0}"
+          if [ $? -eq 0 ];
+          then
+            echo -e " ${bold_white}$SCRIPT_NAME${colors_off} wurde aktualisiert und beendet - bitte jetzt neu aufrufen ... $OK_TAG"
+          else
+            echo -e " $ERROR_TAG: Die Aktualisierung konnte leider ${bold_red}nicht${colors_off} korrekt durchgeführt werden."
+            echo -e " Zum Überspringen der Aktualisierung bitte die Option ${light_cyan}--noupdate${colors_off} verwenden."
+          fi
+          exit 1
+        else
+          echo -e " $ERROR_TAG: Sicherung konnte nicht angelegt werden"
+        fi
+      else
+        remove_file "$LOCAL_DOWNLOAD_FILE"
+      fi
+      echo -e "$FULL_LINE"
     else
-      echo -e "$ERROR_TAG"
+      remove_file "$LOCAL_DOWNLOAD_FILE"
+    fi
+  else
+    remove_file "$LOCAL_DOWNLOAD_FILE"
+  fi
+fi
+
+#===============================================================================
+# Erstellung eines Starters
+#===============================================================================
+# --------------------------------------------------------------------
+# Explizit mit Verwendung der aktuellen Parameter
+# --------------------------------------------------------------------
+if [ $CREATE_STARTER -eq 1 ];
+then
+  create_starter 1
+else
+  # ------------------------------------------------------------------
+  # Wenn noch kein Starter existiert, dann nur einen Standard-Starter
+  # ------------------------------------------------------------------
+  if [ $(find "$DESKTOP_DIR" -type f -iname "sd-copy*.desktop" 2>/dev/null | wc -l) -eq 0 ];
+  then
+    echo -e ""
+    echo -e " $HINWEIS_TAG: Es scheint kein ${light_cyan}Starter${colors_off} für SD-Copy v$VERSION angelegt zu sein."
+    ask_yes_or_no "Jetzt Starter (Symbol) auf dem Desktop anlegen" "j"
+    if [ $? -eq 1 ];
+    then
+      create_starter 0
     fi
   fi
 fi
@@ -1002,39 +1103,69 @@ fi
 
 #===============================================================================
 # Durchführung des Kopier-Vorgangs
-# -----------------------------------------------------------
-# Wenn Clonezilla nicht installiert ist, dann nur den Deep-Modus (dd)
-# zulassen. Ansonsten fragen, welcher Modus verwendet werden soll ...
 #===============================================================================
-echo -e ""
-echo -e " ${bold_white}OK${colors_off}, ich bin bereit für den Kopier-Vorgang - nur noch eine Frage ..."
-echo -e ""
 # ------------------------------------------------------------------------------
-# Kopier-Modus abfragen / festlegen
+# Nur den Boot-Sektor immer mit dd
 # ------------------------------------------------------------------------------
-if [ -f "/usr/sbin/ocs-onthefly" ];
+if [ $BOOTSECTOR_ONLY -eq 0 ];
 then
-  echo -e " $HINWEIS_TAG: Im Standard werden nur die Sektoren kopiert, welche auch mit Daten"
-  echo -e " belegt sind, wodurch der Kopier-Vorgang ganz erheblich beschleunigt werden"
-  echo -e " kann. Um zudem auch alle unbelegten Sektoren zu kopieren, kann statt dessen"
-  echo -e " der Deep-Mode (Klonen mit dd) verwendet werden, was je nach Belegung der"
-  echo -e " Quelle allerdings sehr viel länger (bis zu einigen Stunden) dauern kann!"
-  echo -e ""
-  ask_yes_or_no "Soll der Deep-Mode verwendet werden?" "$DEFAULT_DEEPMODE"
-  deep_mode=$?
-  echo -e -n " ${bold_white}OK${colors_off}, also "
-  if [ $deep_mode -eq 1 ];
+  # --------------------------------------------------
+  # Wenn Clonezilla nicht ordentlich installiert ist,
+  # dann nur den Deep-Modus (dd) zulassen.
+  # --------------------------------------------------
+  if [ ! -f "/usr/sbin/ocs-onthefly" ];
   then
-    echo -e "im Deep-Mode kopieren - das kann einige Stunden dauern!"
+    # ---------------------------------------------------------------------
+    # Wenn ocs-Modus explizit gewünscht, dann Hinweis, dass das nicht geht
+    # ---------------------------------------------------------------------
+    if [ $USE_OCSMODE -eq 1 ];
+    then
+      echo -e " $HINWEIS_TAG: Es steht nur der Deep-Mode (Klonen mit dd) zur Verfügung,"
+      echo -e " der Kopier-Vorgang wird daher sehr viel Zeit in Anspruch nehmen!"
+    fi
+    deep_mode=1
   else
-    echo -e "${bold_blue}keinen${colors_off} Deep-Mode verwenden - das geht schneller."
+    # --------------------------------------------------------------------
+    # Wenn kein Modus gesetzt ist, dann gewünschten Kopier-Modus abfragen
+    # --------------------------------------------------------------------
+    if [ $USE_DEEPMODE -eq 0 ] &&
+       [ $USE_OCSMODE -eq 0 ];
+    then
+      echo -e ""
+      echo -e " ${bold_white}OK${colors_off}, ich bin bereit für den Kopier-Vorgang - nur noch eine Frage ..."
+      echo -e ""
+      echo -e " $HINWEIS_TAG: Im Standard werden nur die Sektoren kopiert, welche auch mit Daten"
+      echo -e " belegt sind, wodurch der Kopier-Vorgang ganz erheblich beschleunigt werden"
+      echo -e " kann. Um zudem auch alle unbelegten Sektoren zu kopieren, kann statt dessen"
+      echo -e " der Deep-Mode (Klonen mit dd) verwendet werden, was je nach Belegung der"
+      echo -e " Quelle allerdings sehr viel länger (bis zu einigen Stunden) dauern kann!"
+      echo -e ""
+      ask_yes_or_no "Soll der Deep-Mode verwendet werden?" "n"
+      deep_mode=$?
+      echo -e -n " ${bold_white}OK${colors_off}, also "
+      if [ $deep_mode -eq 1 ];
+      then
+        echo -e "im Deep-Mode kopieren - das kann einige Stunden dauern!"
+      else
+        echo -e "${bold_blue}keinen${colors_off} Deep-Mode verwenden - das geht schneller."
+      fi
+    else
+      # ---------------------------------------------------
+      # Wenn ein Kopiermodus-gesetzt ist, diesen verwenden
+      # ---------------------------------------------------
+      if [ $USE_DEEPMODE -eq 1 ];
+      then
+        deep_mode=1
+      else
+        deep_mode=0
+      fi
+    fi
   fi
 else
-  echo -e " $HINWEIS_TAG: Es steht nur der Deep-Mode (Klonen mit dd) zur Verfügung,"
-  echo -e " der Kopier-Vorgang wird daher sehr viel Zeit in Anspruch nehmen!"
   deep_mode=1
 fi
 echo -e ""
+
 # ------------------------------------------------------------------------------
 # Sicherheitsabfragen
 # ------------------------------------------------------------------------------
@@ -1142,7 +1273,7 @@ then
     # --------------------------
     if [ $COPY_RESULT -eq 0 ];
     then
-      echo -e "$FULL_LINE"
+      if [ $BOOTSECTOR_ONLY -eq 0 ]; then echo -e "$FULL_LINE"; fi
       echo -e -n " Kopiere Bootsektor (MBR) ... "
       dd conv=noerror,sync if=/dev/${source_device} of=/dev/${dest_device} bs=512 count=1 &>/dev/null
       COPY_RESULT=$?

@@ -1072,7 +1072,8 @@ then
     fi
   fi
 else
-  if [ $devices_in_list -lt 2 ];
+  if [ $AUTOMATIC_MODE -eq 0 ] &&
+     [ $devices_in_list -lt 2 ];
   then
     echo -e " $HINWEIS_TAG: Es wurden nicht genug angeschlossene Speichermedien zum Kopieren"
     echo -e " gefunden, daher wird jetzt der automatische Modus gestartet."

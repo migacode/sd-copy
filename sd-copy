@@ -40,7 +40,7 @@
 #                                                                              #
 ################################################################################
 # Letzte Änderung: 15.05.2025
-VERSION="1.70"
+VERSION="1.71"
 
 ################################################################################
 #                                                                              #
@@ -105,36 +105,43 @@ function create_starter {
     if [ $AUTOMATIC_MODE -eq 1 ];
     then
       STARTER_FILE+="_a"
-      STARTER_NAME+="A"
+      STARTER_NAME+="a"
       SCRIPT_CALL+=" -a"
     fi
     # bootonly
     if [ $BOOTSECTOR_ONLY -eq 1 ];
     then
       STARTER_FILE+="_b"
-      STARTER_NAME+="B"
+      STARTER_NAME+="b"
       SCRIPT_CALL+=" -b"
     fi
     # deepmode
     if [ $USE_DEEPMODE -eq 1 ];
     then
       STARTER_FILE+="_d"
-      STARTER_NAME+="D"
+      STARTER_NAME+="d"
       SCRIPT_CALL+=" -d"
     fi
     # noupdate
     if [ $CHECK_UPDATE -eq 0 ];
     then
       STARTER_FILE+="_n"
-      STARTER_NAME+="N"
+      STARTER_NAME+="n"
       SCRIPT_CALL+=" -n"
     fi
     # ocsmode
     if [ $USE_OCSMODE -eq 1 ];
     then
       STARTER_FILE+="_o"
-      STARTER_NAME+="O"
+      STARTER_NAME+="o"
       SCRIPT_CALL+=" -o"
+    fi
+    # noboots
+    if [ $NO_BOOTSECTOR -eq 1 ];
+    then
+      STARTER_FILE+="_t"
+      STARTER_NAME+="t"
+      SCRIPT_CALL+=" -t"
     fi
     STARTER_NAME+=")"
   fi
@@ -545,6 +552,29 @@ function show_human_bytes {
   echo "$THE_NUMBER"
 }
 
+#===============================================================================
+# Anzeige der Kommandozeilen-Optionen
+#===============================================================================
+function show_options {
+  echo -e " Optionen:\n"
+  echo -e "  -a, --automode  Startet immer direkt den automatischen Medien-Auswahl-Modus.\n"
+  echo -e "  -b, --bootonly  Kopiert NUR den Bootsektor (MBR) und keine sonstigen Daten"
+  echo -e "                  (setzt die Optionen ocsmode und deepmode außer Kraft).\n"
+  echo -e "  -d, --deepmode  Verwendet den Deep-Modus (dd) für den Kopier-Vorgang."
+  echo -e "                  Dabei werden sämtliche Sektoren der Quelle kopiert, was"
+  echo -e "                  zu einer sehr langen Dauer des Kopier-Vorgangs führen kann.\n"
+  echo -e "  -h, --help      Zeigt diese Hilfe an.\n"
+  echo -e "  -n, --noupdate  Sucht nicht nach Updates für dieses Skript.\n"
+  echo -e "  -o, --ocsmode   Verwendet den OCS-Modus (Clonezilla) für den Kopier-Vorgang."
+  echo -e "                  Dabei werden nur belegte Sektoren der Quelle kopiert, was"
+  echo -e "                  den Kopiervorgang je nach Belegung erheblich beschleunigt"
+  echo -e "                  (die Option ocsmode setzt die Option deepmode außer Kraft).\n"
+  echo -e "  -s, --starter   Erstellt einen Desktop-Starter mit aktuellen Einstellungen.\n"
+  echo -e "  -t, --noboots   Kopiert den Bootsektor (MBR) der Quelle NICHT und lässt den"
+  echo -e "                  Bootsektor des Ziels unverändert. Diese Option steht nur in"
+  echo -e "                  Verbindung mit dem OCS-Kopier-Modus (ocsmode) zur Verfügung.\n"
+}
+
 ################################################################################
 #                                                                              #
 #                             Variablen definieren                             #
@@ -711,6 +741,7 @@ AUTOMATIC_MODE=0
 BOOTSECTOR_ONLY=0
 CHECK_UPDATE=1
 CREATE_STARTER=0
+NO_BOOTSECTOR=0
 USE_DEEPMODE=0
 USE_OCSMODE=0
 for arg in $@;
@@ -748,20 +779,7 @@ do
     echo -e ""
     echo -e " Syntax: sudo ${0} [Optionen]"
     echo -e ""
-    echo -e " Optionen:\n"
-    echo -e "  -a, --automode  Startet immer direkt den automatischen Medien-Auswahl-Modus.\n"
-    echo -e "  -b, --bootonly  Kopiert nur den Bootsektor (MBR) und keine sonstigen Daten"
-    echo -e "                  (hat Vorrang vor den Optionen ocsmode und deepmode).\n"
-    echo -e "  -d, --deepmode  Verwendet den Deep-Modus (dd) für den Kopier-Vorgang."
-    echo -e "                  Dabei werden sämtliche Sektoren der Quelle kopiert, was"
-    echo -e "                  zu einer sehr langen Dauer des Kopier-Vorgangs führen kann.\n"
-    echo -e "  -h, --help      Zeigt diese Hilfe an.\n"
-    echo -e "  -n, --noupdate  Sucht nicht nach Updates für dieses Skript.\n"
-    echo -e "  -o, --ocsmode   Verwendet den OCS-Modus (Clonezilla) für den Kopier-Vorgang."
-    echo -e "                  Dabei werden nur belegte Sektoren der Quelle kopiert, was"
-    echo -e "                  den Kopiervorgang je nach Belegung erheblich beschleunigt"
-    echo -e "                  (die Option ocsmode hat Vorrang vor der Option deepmode).\n"
-    echo -e "  -s, --starter   Erstellt einen Desktop-Starter mit aktuellen Einstellungen.\n"
+    show_options
     exit 0
   fi
   # ----------------------------------------------------------------------------
@@ -785,6 +803,13 @@ do
   then
     CREATE_STARTER=1
   fi
+  # ----------------------------------------------------------------------------
+  # noboots
+  # ----------------------------------------------------------------------------
+  if [ "$arg" == "--noboots" ] || [ "$arg" == "-t" ];
+  then
+    NO_BOOTSECTOR=1
+  fi
 done
 # ------------------------------------------------------------------------------
 # Konflikte bereinigen
@@ -798,6 +823,15 @@ if [ $BOOTSECTOR_ONLY -eq 1 ];
 then
   USE_DEEPMODE=0
   USE_OCSMODE=0
+fi
+if [ $BOOTSECTOR_ONLY -eq 1 ] &&
+   [ $NO_BOOTSECTOR -eq 1 ];
+then
+  echo -e ""
+  echo -e " $ERROR_TAG: Optionen ${bold_white}bootonly${colors_off} und ${bold_white}noboots${colors_off} können nicht gemeinsam verwendet werden."
+  echo -e ""
+  show_options
+  exit 1
 fi
 
 #===============================================================================
@@ -1203,7 +1237,7 @@ if [ $? -eq 1 ];
 then
   echo -e ""
   echo -e " Zur Sicherheit noch ein letztes Mal - versprochen, danach geht's sofort los!"
-  echo -e " $ACHTUNG_TAG: ALLE Daten auf ${bold_white}$dest_device${colors_off} werden UNWIEDERBRINGLICH gelöscht!"
+  echo -e " $ACHTUNG_TAG: ALLE Daten auf ${bold_white}$dest_device${colors_off} werden UNWIEDERBRINGLICH überschrieben!"
   ask_yes_or_no "Jetzt wirklich ${bold_yellow}$source_device${colors_off} auf ${bold_yellow}$dest_device${colors_off} kopieren?" ""
   if [ $? -eq 1 ];
   then
@@ -1279,7 +1313,9 @@ then
     if [ $deep_mode -eq 0 ] &&
        [ $BOOTSECTOR_ONLY -eq 0 ];
     then
-      /usr/sbin/ocs-onthefly -batch -e1 auto -e2 -icds -iui -ius -j2 -rvd -nogui -pa true --source ${source_device} --target ${dest_device}
+      NOBOOTOPT=""
+      if [ $NO_BOOTSECTOR -eq 1 ]; then NOBOOTOPT="-t"; fi
+      /usr/sbin/ocs-onthefly -batch -e1 auto -e2 -icds -iui -ius -j2 -rvd ${NOBOOTOPT} -nogui -pa true --source ${source_device} --target ${dest_device}
       COPY_RESULT=$?
     fi
 
@@ -1296,11 +1332,12 @@ then
     # --------------------------
     # Bootsektor (MBR) kopieren
     # --------------------------
-    if [ $COPY_RESULT -eq 0 ];
+    if [ $COPY_RESULT -eq 0 ] &&
+       [ $NO_BOOTSECTOR -eq 0 ];
     then
       if [ $BOOTSECTOR_ONLY -eq 0 ]; then echo -e "$FULL_LINE"; fi
       echo -e -n " Kopiere Bootsektor (MBR) ... "
-      dd conv=noerror,sync if=/dev/${source_device} of=/dev/${dest_device} bs=512 count=1 &>/dev/null
+      dd conv=noerror,sync if=/dev/${source_device} of=/dev/${dest_device} bs=512 count=2 &>/dev/null
       COPY_RESULT=$?
       if [ $COPY_RESULT -eq 0 ];
       then

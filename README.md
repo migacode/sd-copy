@@ -18,11 +18,25 @@ Zudem ist es auch möglich, nur den Bootloader alleine zu kopieren, was bei der 
 <br />
 <b>Optionen zum Aufruf per Kommandozeile:</b><br />
 <code>
-  -a, --automode  Startet immer direkt den automatischen Modus.<br />
-  -b, --bootonly  Kopiert nur den Bootsektor (MBR) und keine sonstigen Daten.<br />
-  -d, --deep      Setzt den Deep-Modus (dd) als Vorgabe für den Kopiermodus.<br />
-  -h, --help      Zeigt die Hilfe an.<br />
+  -a, --automode  Startet immer direkt den automatischen Medien-Auswahl-Modus.<br />
+<br />
+  -b, --bootonly  Kopiert nur den Bootsektor (MBR) und keine sonstigen Daten<br />
+                  (hat Vorrang vor den Optionen ocsmode und deepmode).<br />
+<br />
+  -d, --deepmode  Verwendet den Deep-Modus (dd) für den Kopier-Vorgang.<br />
+                  Dabei werden sämtliche Sektoren der Quelle kopiert, was<br />
+                  zu einer sehr langen Dauer des Kopier-Vorgangs führen kann.<br />
+<br />
+  -h, --help      Zeigt diese Hilfe an.<br />
+<br />
   -n, --noupdate  Sucht nicht nach Updates für dieses Skript.<br />
+<br />
+  -o, --ocsmode   Verwendet den OCS-Modus (Clonezilla) für den Kopier-Vorgang.<br />
+                  Dabei werden nur belegte Sektoren der Quelle kopiert, was<br />
+                  den Kopiervorgang je nach Belegung erheblich beschleunigt<br />
+                  (die Option ocsmode hat Vorrang vor der Option deepmode).<br />
+<br />
+  -s, --starter   Erstellt einen Desktop-Starter mit aktuellen Einstellungen.<br />
 </code>
 <br />
 <hr>

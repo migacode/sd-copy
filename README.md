@@ -4,7 +4,9 @@ Wem die Bedienung von Clonezilla zu aufwendig ist, der kann einen Kopiervorgang 
 Alternativ dazu gibt es einen interaktiven Modus, bei welchem man nacheinander das Quell- und Ziel-Laufwerk anschließen kann und <b>SD-Copy</b> diese dabei automatisch erkennt und auswählt.<br />
 Bei dem Kopiervorgang werden dann wahlweise nur die belegten oder alle Sektoren des Speichermediums kopiert, wobei die erste Option erheblich Zeit spart.<br />
 Darüber hinaus wird auch immer der erste Sektor des Speichermediums mit dem Bootloader (MBR) kopiert, so dass dieser auf der Kopie nicht mehr nachträglich mit externen Tools korrigiert werden muss.<br />
-Zudem ist es auch möglich, nur den Bootloader alleine zu kopieren, was bei der Reparatur nicht mehr startfähiger Systeme hilfreich sein kann.<br />
+Zudem wird auch immer der erste Sektor des Speichermediums mit dem Bootloader (MBR) kopiert, so dass dieser auf der Kopie nicht mehr nachträglich mit externen Tools korrigiert werden muss.<br />
+Es ist allerdings auch möglich, nur den Bootloader alleine zu kopieren oder diesen beim Kopier-Vorgang auszulassen, was bei der Reparatur nicht mehr startfähiger Systeme hilfreich sein kann.<br />
+Darüber hinaus wird der Kopier-Vorgang bei Lesefehlern nicht abgebrochen, sondern es wird versucht möglich viele Daten zu retten.
 <br />
 <b>Automatischer Modus</b><br />
 <img src="./img/sd-copy_screen_1.png"><br />

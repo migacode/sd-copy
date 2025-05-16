@@ -39,8 +39,8 @@
 #   über https://migano.de oder per E-Mail an kontakt@migano.de. Danke.        #
 #                                                                              #
 ################################################################################
-# Letzte Änderung: 15.05.2025
-VERSION="1.71"
+# Letzte Änderung: 16.05.2025
+VERSION="1.72"
 
 ################################################################################
 #                                                                              #
@@ -1315,7 +1315,7 @@ then
     then
       NOBOOTOPT=""
       if [ $NO_BOOTSECTOR -eq 1 ]; then NOBOOTOPT="-t"; fi
-      /usr/sbin/ocs-onthefly -batch -e1 auto -e2 -icds -iui -ius -j2 -rvd ${NOBOOTOPT} -nogui -pa true --source ${source_device} --target ${dest_device}
+      /usr/sbin/ocs-onthefly -batch -e1 auto -e2 -icds -iui -ius -j2 -nogui -pa true -rescue -rvd ${NOBOOTOPT} --source ${source_device} --target ${dest_device}
       COPY_RESULT=$?
     fi
 

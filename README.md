@@ -18,25 +18,29 @@ Zudem ist es auch möglich, nur den Bootloader alleine zu kopieren, was bei der 
 <br />
 <b>Optionen zum Aufruf per Kommandozeile:</b><br />
 <code>
-&nbsp;&nbsp;-a, --automode&nbsp;&nbsp;Startet immer direkt den automatischen Medien-Auswahl-Modus.<br />
+&nbsp;&nbsp;-a,&nbsp;--automode&nbsp;&nbsp;Startet immer direkt den automatischen Medien-Auswahl-Modus.<br />
 <br />
-&nbsp;&nbsp;-b, --bootonly&nbsp;&nbsp;Kopiert nur den Bootsektor (MBR) und keine sonstigen Daten<br />
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(hat Vorrang vor den Optionen ocsmode und deepmode).<br />
+&nbsp;&nbsp;-b,&nbsp;--bootonly&nbsp;&nbsp;Kopiert NUR den Bootsektor (MBR) und keine sonstigen Daten<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(setzt die Optionen ocsmode und deepmode außer Kraft).<br />
 <br />
-&nbsp;&nbsp;-d, --deepmode&nbsp;&nbsp;Verwendet den Deep-Modus (dd) für den Kopier-Vorgang.<br />
+&nbsp;&nbsp;-d,&nbsp;--deepmode&nbsp;&nbsp;Verwendet den Deep-Modus (dd) für den Kopier-Vorgang.<br />
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Dabei werden sämtliche Sektoren der Quelle kopiert, was<br />
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;zu einer sehr langen Dauer des Kopier-Vorgangs führen kann.<br />
 <br />
-&nbsp;&nbsp;-h, --help&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Zeigt diese Hilfe an.<br />
+&nbsp;&nbsp;-h,&nbsp;--help&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Zeigt diese Hilfe an.<br />
 <br />
-&nbsp;&nbsp;-n, --noupdate&nbsp;&nbsp;Sucht nicht nach Updates für dieses Skript.<br />
+&nbsp;&nbsp;-n,&nbsp;--noupdate&nbsp;&nbsp;Sucht nicht nach Updates für dieses Skript.<br />
 <br />
-&nbsp;&nbsp;-o, --ocsmode&nbsp;&nbsp; Verwendet den OCS-Modus (Clonezilla) für den Kopier-Vorgang.<br />
+&nbsp;&nbsp;-o,&nbsp;--ocsmode&nbsp;&nbsp; Verwendet den OCS-Modus (Clonezilla) für den Kopier-Vorgang.<br />
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Dabei werden nur belegte Sektoren der Quelle kopiert, was<br />
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;den Kopiervorgang je nach Belegung erheblich beschleunigt<br />
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(die Option ocsmode hat Vorrang vor der Option deepmode).<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(die Option ocsmode setzt die Option deepmode außer Kraft).<br />
 <br />
-&nbsp;&nbsp;-s, --starter&nbsp;&nbsp; Erstellt einen Desktop-Starter mit aktuellen Einstellungen.<br />
+&nbsp;&nbsp;-s,&nbsp;--starter&nbsp;&nbsp; Erstellt einen Desktop-Starter mit aktuellen Einstellungen.<br />
+<br />
+&nbsp;&nbsp;-t,&nbsp;--noboots&nbsp;&nbsp; Kopiert den Bootsektor (MBR) der Quelle NICHT und lässt den<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Bootsektor des Ziels unverändert. Diese Option steht nur in<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Verbindung mit dem OCS-Kopier-Modus (ocsmode) zur Verfügung.<br />
 </code>
 <br />
 <hr>

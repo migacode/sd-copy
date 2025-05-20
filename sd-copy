@@ -39,8 +39,8 @@
 #   über https://migano.de oder per E-Mail an kontakt@migano.de. Danke.        #
 #                                                                              #
 ################################################################################
-# Letzte Änderung: 16.05.2025
-VERSION="1.72"
+# Letzte Änderung: 20.05.2025
+VERSION="1.73"
 
 ################################################################################
 #                                                                              #
@@ -849,7 +849,7 @@ fi
 #===============================================================================
 echo -e ""
 echo -e " Prüfe System-Voraussetzungen:"
-required_packages=('clonezilla' 'smartmontools' 'util-linux')
+required_packages=('clonezilla' 'eject' 'smartmontools' 'util-linux')
 # -------------
 # Schnell-Test
 # -------------

@@ -39,8 +39,19 @@
 #   über https://migano.de oder per E-Mail an kontakt@migano.de. Danke.        #
 #                                                                              #
 ################################################################################
-# Letzte Änderung: 20.05.2025
-VERSION="1.73"
+# Letzte Änderung: 23.06.2025
+VERSION="1.74"
+
+################################################################################
+#                                                                              #
+#           Bei unzureichenden Zugriffsrechten mit sudo durchstarten           #
+#                                                                              #
+################################################################################
+if [ $(id -u) -ne 0 ]; then
+   sudo -kK
+   sudo --preserve-env=XDG_SESSION_TYPE "$0" "$@"
+   exit 0
+fi
 
 ################################################################################
 #                                                                              #
@@ -777,7 +788,7 @@ do
     echo -e " Erstellt \"on-the-fly\" eine vollständige Kopie eines Speichermediums auf ein"
     echo -e " anderes Medium. Dazu müssen beide Speichermedien physisch angeschlossen sein."
     echo -e ""
-    echo -e " Syntax: sudo ${0} [Optionen]"
+    echo -e " Syntax: ${0} [Optionen]"
     echo -e ""
     show_options
     exit 0
@@ -831,16 +842,6 @@ then
   echo -e " $ERROR_TAG: Optionen ${bold_white}bootonly${colors_off} und ${bold_white}noboots${colors_off} können nicht gemeinsam verwendet werden."
   echo -e ""
   show_options
-  exit 1
-fi
-
-#===============================================================================
-# Aufruf als Superuser prüfen
-#===============================================================================
-if [ $(id -u) -ne 0 ];
-then
-  echo -e ""
-  echo -e " Bitte als Superuser aufrufen!"
   exit 1
 fi
 
